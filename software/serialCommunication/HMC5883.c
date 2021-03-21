@@ -1,0 +1,1 @@
+int getDataFromHMC5883(){};
