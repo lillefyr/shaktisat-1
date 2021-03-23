@@ -9,21 +9,17 @@
 #include "DS3231.h"
 
 #define OK 0
-#define PART -1
-#define EOD -2
+#define OVERFLOW -1
 
 #define SoftSerial uart_instance[1]
 
-char data[17]; // only 16 byte i uart
-char command[200];
-uint8_t command_start = 0;
+char data[200];
+char buf[200];
+unsigned int read_buf[7] = {0x00};
+unsigned int hour, minute, second, date, month, year;
 char ch;
-char buf[15];
 int  cnt=0;
 int  returnCode;
-uint32_t checksum;
-uint32_t checksum2;
-
 
 int write_to_uart(char *data)
 {
@@ -41,23 +37,23 @@ int read_from_uart(char *data) {
   char ch;
   uint8_t retries=0;
   char *str = data;
-  for (int i = 0; i < 16; i++)
+  for (int i = 0; i < 199; i++)
   {
-    //printf("status=  0x%x  Flag=  0x%x\n", SoftSerial->status, STS_RX_NOT_EMPTY);
-    // if no data available return
-    if ((SoftSerial->status & STS_RX_NOT_EMPTY) != STS_RX_NOT_EMPTY) { return EOD; }
+    // blocking read. We will get a kick from GS every minute
+    // should really be unblocking read, but it is not implemented in the library
+    // uart buffer contains 16 char
+    read_uart_character(SoftSerial, &ch);
 
-    //read_uart_character(SoftSerial, &ch);
-    ch = SoftSerial->rcv_reg;
+    if ( ch == 0x00 ) { ch = '\n'; }
 
     if ((( ch >= 0x20 ) && ( ch < 0x7F )) || ( ch == '\n' )) {
-      if ( ch == '\n' ) { printf("data read\n"); return OK; }
-      printf("%c ",ch);
+      if ( ch == '\n' ) { return OK; }
+      //printf("%c ",ch);
       *str = ch;
       str++;
     }    
   }
-  return PART;
+  return OVERFLOW;
 }
 
 void main()
@@ -68,64 +64,43 @@ void main()
 
   write_to_uart("Hello World\n");
 
+  initDS3231();
+  // updateDS3231Time( 19, 35, 00, 21, 03, 2021);
+
   while (1)
   {
 
     // read command from GS ( in 16 byte pieces )
     // this do read non blocking. Not implemented in uart library
     // \n is end of line marker
-
-    // reset buffer
-    for (int i=0; i< 15; i++) { data[i] = '\n'; }
-
     // read data from uart. 16 or less chars
+    for (uint8_t i=0; i< 200; i++) { data[i] = 0x00; }
     returnCode = read_from_uart(data);
 
     // \n found, end of command
     if ( returnCode == OK ){ 
-      printf("OK. Complete command for shakti: %s\n",data);
-      checksum = 0;
-      for (int i = 0; i < 15; i++ ){
-        command[command_start+i] = data[i];
-        checksum += data[i];  // add 16 values
-      }
-      write_to_uart(data); // send data back
-      command_start = 0; // ready for next command
+      printf("Command for shakti: %s\n",data);
     }
 
-    // no \n found so partial message
-    if ( returnCode == PART ){ 
-      printf("PART: <%s>\n",data);
-      checksum = 0;
-      for (int i = 0; i < 15; i++ ){
-        command[command_start+i] = data[i];
-        checksum += data[i];  // add 16 values
-      }
-      printf("Checksum=0x%x", checksum);
-      write_to_uart(data); // send data back
-// need more ack&nack and framenumber
-      command_start += 16; // ready for next part of command
+    // no \n found so probably bad data
+    if ( returnCode == OVERFLOW ){ 
+      printf("OVERFLOW: <%s>\n",data);
     }
 
-    // end of data reached without \n , discard command
-    if ( returnCode == EOD ){ 
-      //printf("EOD command for shakti: <%s>\n", data);
-      command_start = 0; // ready for next command
-    }
-
-    if ( command_start == 0 ) {
     // if we are not receiving a command, then get data for downlink
-      getDataFromMPU6050();
-      getDataFromHMC5883();
-      getDataFromBME280();
-      getDataFromDS3231();
+    getDataFromMPU6050();
+    getDataFromHMC5883();
+    getDataFromBME280();
+
+    readDS3231(&read_buf);
+    sprintf(buf, "OnboardTime : %x-%x-20%x %x:%x:%x\n",
+        read_buf[4], read_buf[5], read_buf[6], read_buf[2], read_buf[1], read_buf[0]);
   
-      sprintf(buf, "Msg num: %d\n", cnt);
-      write_to_uart(buf);
-      printf(buf);
-      for (int i=0; i< 16; i++) { buf[i] = 0x00; }
-      cnt++;
-      delay_loop(3000, 3000);
-    }
+    //sprintf(buf, "Msg num: %d\n", cnt);
+    write_to_uart(buf);
+    printf(buf);
+    for (int i=0; i< 16; i++) { buf[i] = 0x00; }
+    cnt++;
+    delay_loop(3000, 3000);
   }
 }
