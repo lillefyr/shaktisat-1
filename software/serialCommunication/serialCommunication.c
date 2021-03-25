@@ -3,6 +3,7 @@
 #include "pinmux.h"
 #include "log.h"
 
+#include "common.h"
 #include "MPU6050.h"
 #include "HMC5883.h"
 #include "BME280.h"
@@ -20,6 +21,12 @@ unsigned int hour, minute, second, date, month, year;
 char ch;
 int  cnt=0;
 int  returnCode;
+
+int8_t bmp280Available = -1;
+int8_t bme280Available = -1;
+
+unsigned int tempReadValue = 0;
+unsigned long pressure = 0, temperature = 0;
 
 int write_to_uart(char *data)
 {
@@ -59,13 +66,34 @@ int read_from_uart(char *data) {
 void main()
 {
   *pinmux_config_reg = 0x05;
+
+  // set GPIO2 to interrupt pin
+  // set GPIO3 to digital out for LED
+  // attachInterrupt(digitalPinToInterrupt(2), setFlag, CHANGE);
+
   set_baud_rate(SoftSerial, 115200); // baudrate = 9600;
   delay_loop(1000, 1000);
 
-  write_to_uart("Hello World\n");
+  // I2C init for all devices (except soft I2C)
+  i2c_init();
+
+  //Initialises I2C Controller
+  if(config_i2c(I2C, PRESCALER_COUNT,SCLK_COUNT))
+  {
+    printf("Error in I2c initialization, stopping\n");
+    return -1;
+  }
+  printf("Intilization BMP280_STATUS_REGISTER Done\n");
+
+  write_to_uart("Hello Shaktisat\n");
 
   initDS3231();
   // updateDS3231Time( 19, 35, 00, 21, 03, 2021);
+
+  bmp280Available = init_bmp280();
+  //bme280Available = init_bmpe80();
+
+  setAlarmEveryMinute(); // not yet working
 
   while (1)
   {
@@ -75,7 +103,8 @@ void main()
     // \n is end of line marker
     // read data from uart. 16 or less chars
     for (uint8_t i=0; i< 200; i++) { data[i] = 0x00; }
-    returnCode = read_from_uart(data);
+    //returnCode = read_from_uart(data);
+    returnCode = 123;
 
     // \n found, end of command
     if ( returnCode == OK ){ 
@@ -90,16 +119,38 @@ void main()
     // if we are not receiving a command, then get data for downlink
     getDataFromMPU6050();
     getDataFromHMC5883();
-    getDataFromBME280();
 
+    printf("read date and time\n");
     readDS3231(&read_buf);
     sprintf(buf, "OnboardTime : %x-%x-20%x %x:%x:%x\n",
         read_buf[4], read_buf[5], read_buf[6], read_buf[2], read_buf[1], read_buf[0]);
-  
-    //sprintf(buf, "Msg num: %d\n", cnt);
+
     write_to_uart(buf);
     printf(buf);
     for (int i=0; i< 16; i++) { buf[i] = 0x00; }
+    delay_loop(3000, 3000);
+
+    if (bmp280Available == 0 ) {
+      write_bmp280_register(I2C, BMP280_CTRL_MEANS, BMP280_NORMAL_MODE, 1000);     // Set it to NORMAL MODE
+      if(read_bmp280_register(I2C, BMP280_STATUS_REGISTER, &tempReadValue, 1000) == 0) {
+        if(!(tempReadValue & 0x9)) {
+          //Read pressure and temperature values.
+          read_bmp280_values(I2C, 0xF7, &pressure, &temperature, 1000);
+
+          sprintf(buf, "Pressure : %d, Temperature %d\n", pressure, temperature);
+          write_to_uart(buf);
+          printf(buf);
+          for (int i=0; i< 16; i++) { buf[i] = 0x00; }
+        }
+      }
+      else
+      {
+        //Display the error
+        printf("Temperature read failed.\n");
+      }
+    }
+  
+    //sprintf(buf, "Msg num: %d\n", cnt);
     cnt++;
     delay_loop(3000, 3000);
   }

@@ -1,16 +1,9 @@
-
 #include "i2c.h"
 #include "log.h"
 #include "uart.h"
 
-#define UPDATE_TIME 1
-#define I2C i2c_instance[1]
-#define DS3231_SLAVE_ADDRESS 0XD0
-#define DS3231_REG_OFFSET 0
-#define DS3231_DEC_TO_HEX(decimal)  ( ( (decimal / 10 ) << 4) | (decimal % 10) )
-#define DELAY_VALUE 900
-#define PRESCALER_COUNT 0x1F
-#define SCLK_COUNT 0x91
+#include "common.h"
+#include "DS3231.h"
 
 int read_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, unsigned int *readTemp, unsigned char length, unsigned long delay)
 {
@@ -106,4 +99,52 @@ int updateDS3231Time( unsigned int hour, unsigned int minute, unsigned int secon
   length = 7;
 
   write_ds3231_registers(I2C, 0x00, &write_buf[0], length, 1000);
+}
+
+
+//====== NEW stuff============
+
+void setAlarmEveryMinute() {
+
+// alarm every minute
+  unsigned int read_buf[7];
+  unsigned int alarm2int;
+  unsigned int control;
+  unsigned int status;
+
+  read_ds3231_registers(I2C, DS3231_REG_OFFSET, &read_buf[0], 7, 1000);
+
+  //read_buf[0] //second
+  //read_buf[1] //minute
+  //read_buf[2] //hour
+  //read_buf[4] //date
+  //read_buf[5] //month
+  //read_buf[6] //(year % 100) 
+  
+  printf ("%x %x %x %d\n", read_buf[2], read_buf[1], read_buf[0], 59);
+//  read_buf[0] = 59;
+//  write_ds3231_registers(I2C, DS3231M_CONTROL, &read_buf[0], 1, 1000);
+  write_ds3231_registers(I2C, DS3231M_CONTROL, &read_buf[1], 1, 1000);
+  write_ds3231_registers(I2C, DS3231M_CONTROL, &read_buf[2], 1, 1000);
+
+  read_ds3231_registers(I2C, DS3231M_ALM2MIN, &alarm2int, 1, 1000);
+  alarm2int |= 0x80; // alarmType == everyMinute
+  write_ds3231_registers(I2C, DS3231M_ALM2MIN, &alarm2int, 1, 1000);
+
+  read_ds3231_registers(I2C, DS3231M_CONTROL, &control, 1, 1000);
+  control = control | 0x02; // Set A2IE enable to on
+  write_ds3231_registers(I2C, DS3231M_CONTROL, &control, 1, 1000);
+
+  read_ds3231_registers(I2C, DS3231M_STATUS, &status, 1, 1000);
+  status = status | 0xFC; // Set A1IE, A2IE enable to off
+  write_ds3231_registers(I2C, DS3231M_STATUS, &status, 1, 1000);
+
+  return;
+}  // of method setAlarm
+
+void pinAlarm() {
+  uint8_t control;
+  read_ds3231_registers(I2C, DS3231M_CONTROL, &control, 1, 1000);
+  control = control | 0x04; // set bit 3 on
+  write_ds3231_registers(I2C, DS3231M_CONTROL, &control, 1, 1000);
 }
