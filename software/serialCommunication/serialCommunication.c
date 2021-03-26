@@ -28,6 +28,15 @@ int8_t bme280Available = -1;
 unsigned int tempReadValue = 0;
 unsigned long pressure = 0, temperature = 0;
 
+
+//  Gyro
+char mpu6050buffer[20];
+int AccX, AccY, AccZ;
+int accAngleX, accAngleY, GyroAngleX, GyroAngleY, GyroAngleZ;
+int AccErrorX, AccErrorY, GyroErrorX, GyroErrorY, GyroErrorZ;
+int AccErrorX,AccErrory;
+int GyroX, GyroY, GyroZ;
+
 int write_to_uart(char *data)
 {
   printf(data);
@@ -83,15 +92,14 @@ void main()
     printf("Error in I2c initialization, stopping\n");
     return -1;
   }
-  printf("Intilization BMP280_STATUS_REGISTER Done\n");
+  printf("I2C Intilized\n");
 
   write_to_uart("Hello Shaktisat\n");
 
-  initDS3231();
   // updateDS3231Time( 19, 35, 00, 21, 03, 2021);
 
   bmp280Available = init_bmp280();
-  //bme280Available = init_bmpe80();
+  //bme280Available = init_bme280();
 
   setAlarmEveryMinute(); // not yet working
 
@@ -117,7 +125,6 @@ void main()
     }
 
     // if we are not receiving a command, then get data for downlink
-    getDataFromMPU6050();
     getDataFromHMC5883();
 
     printf("read date and time\n");
@@ -149,8 +156,39 @@ void main()
         printf("Temperature read failed.\n");
       }
     }
-  
+ 
+    mpu6050_measuring_value(&mpu6050buffer);
+    //printf("AccErrorX: %d\n",AccErrorX);
+    //printf("AccErrorY: %d\n",AccErrorY);
+    //printf("GyroErrorX: %d\n",GyroErrorX);
+    //printf("GyroErrorY: %d\n",GyroErrorY);
+    //printf("GyroErrorZ %d\r",GyroErrorZ); 
+
+    printf("AccX: %x\n", (mpu6050buffer[0]<<8 |mpu6050buffer[1])  );
+    printf("AccY: %x\n", (mpu6050buffer[2]<<8 |mpu6050buffer[3])  );
+    printf("AccZ: %x\n", (mpu6050buffer[4]<<8 |mpu6050buffer[5])  );
+
+    printf("GyroX: %x\n", (mpu6050buffer[8]<<8 |mpu6050buffer[9]) );
+    printf("GyroY: %x\n", (mpu6050buffer[10]<<8 |mpu6050buffer[11]) );
+    printf("GyroZ: %x\n", (mpu6050buffer[12]<<8 |mpu6050buffer[13]) );
+
+    AccX = (mpu6050buffer[0]<<8 |mpu6050buffer[1]) / 4096; //16-bit X-axis data
+    AccY = (mpu6050buffer[2]<<8 |mpu6050buffer[3]) / 4096; //16-bit Y-axis data
+    AccZ = (mpu6050buffer[4]<<8 |mpu6050buffer[5]) / 4096; //16-bit Z-axis data
+
+    GyroX = (mpu6050buffer[8]<<8 |mpu6050buffer[9]) / 65.5 ;
+    GyroY = (mpu6050buffer[10]<<8 |mpu6050buffer[11]) / 65.5;
+    GyroZ = (mpu6050buffer[12]<<8 |mpu6050buffer[13]) / 65.5;
+
+    // Correct the outputs with the calculated error values
+    GyroX = GyroX + GyroErrorX ;   // GyroErrorX
+    GyroY = GyroY - GyroErrorY;    // GyroErrorY
+    GyroZ = GyroZ + GyroErrorZ;    // GyroErrorZ
+
+
     //sprintf(buf, "Msg num: %d\n", cnt);
+
+
     cnt++;
     delay_loop(3000, 3000);
   }

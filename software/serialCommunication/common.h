@@ -3,8 +3,6 @@
 
 #include "i2c.h"
 
-#define I2C i2c_instance[1]
-
 #define DELAY_VALUE 900
 #define PRESCALER_COUNT 0x1F
 #define SCLK_COUNT 0x91
