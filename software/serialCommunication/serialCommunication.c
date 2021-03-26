@@ -7,6 +7,7 @@
 #include "MPU6050.h"
 #include "HMC5883.h"
 #include "BME280.h"
+#include "BMP280.h"
 #include "DS3231.h"
 
 #define OK 0
@@ -99,7 +100,7 @@ void main()
   // updateDS3231Time( 19, 35, 00, 21, 03, 2021);
 
   bmp280Available = init_bmp280();
-  //bme280Available = init_bme280();
+  //bme280Available = init_bme280(); // no code available yet
 
   setAlarmEveryMinute(); // not yet working
 
