@@ -1,4 +1,6 @@
 #ifndef MPU6050_H
 #define MPU6050_H
-int getDataFromMPU6050();
+
+void mpu6050_measuring_value();
+int mpu6050_init();
 #endif

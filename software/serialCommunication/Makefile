@@ -18,7 +18,7 @@
 
 SHELL := /bin/bash # Use bash syntax
 DC ?=
-PROGRAM ?=
+PROGRAM ?= serialCommunication
 #default target board
 TARGET ?= artix7_35t
 DEBUG ?=
@@ -28,10 +28,10 @@ XLEN  ?= 32
 FLAGS ?=
 
 all: create_dir
-	make serialCommunication.riscv
+	make $(PROGRAM).riscv
 
-serialCommunication.riscv: create_dir
-	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c ./serialCommunication.c -o ./output/serialCommunication.o -lm -lgcc
+$(PROGRAM).riscv: create_dir
+	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c ./$(PROGRAM).c -o ./output/$(PROGRAM).o -lm -lgcc
 
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c ./MPU6050.c -o ./output/MPU6050.o -lm -lgcc
 
@@ -43,7 +43,9 @@ serialCommunication.riscv: create_dir
 
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(FLAGS) -I$(bspboard) -I$(bspinc) -c $(bspdri)/i2c/i2c_driver.c -o ../../gen_lib/i2c_driver.o -lm -lgcc
 
-	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -T  $(bspboard)/link.ld $(GENLIB)/gen_lib/libshakti$(XLEN).a ./output/serialCommunication.o ./output/MPU6050.o ./output/HMC5883.o ./output/BME280.o ./output/DS3231.o ../../gen_lib/i2c_driver.o -o ./output/$(PROGRAM).shakti -static -nostartfiles -lm -lgcc
+	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c $(bspdri)/i2c/gpio_i2c.c -o ../../gen_lib/gpio_i2c.o -lm -lgcc
+
+	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -T  $(bspboard)/link.ld $(GENLIB)/gen_lib/libshakti$(XLEN).a ./output/$(PROGRAM).o ./output/MPU6050.o ./output/HMC5883.o ./output/BME280.o ./output/DS3231.o ../../gen_lib/i2c_driver.o ../../gen_lib/gpio_i2c.o -o ./output/$(PROGRAM).shakti -static -nostartfiles -lm -lgcc
 
 	@riscv$(XLEN)-unknown-elf-objdump -D ./output/$(PROGRAM).shakti > ./output/$(PROGRAM).dump
 
