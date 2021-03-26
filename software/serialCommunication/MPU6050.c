@@ -1,8 +1,8 @@
 #include"gpio_i2c.h"
 #include "common.h"
 
-#define I2C_WRITE 2
-#define I2C_READ 3
+#define I2C_WRITE 0
+#define I2C_READ 1
 
 #define MPU6050_SLAVE_ADDRESS      0xD0
 #define MPU_6050_OUTPUT_BEGIN      0x3B
