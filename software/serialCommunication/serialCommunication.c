@@ -25,18 +25,24 @@ int  returnCode;
 
 int8_t bmp280Available = -1;
 int8_t bme280Available = -1;
+int8_t mpu6050Available = -1;
 
 unsigned int tempReadValue = 0;
 unsigned long pressure = 0, temperature = 0;
 
 
 //  Gyro
-char mpu6050buffer[20];
-int AccX, AccY, AccZ;
-int accAngleX, accAngleY, GyroAngleX, GyroAngleY, GyroAngleZ;
-int AccErrorX, AccErrorY, GyroErrorX, GyroErrorY, GyroErrorZ;
-int AccErrorX,AccErrory;
-int GyroX, GyroY, GyroZ;
+char readbuf[20];
+int GyroErrorX, GyroErrorY, GyroErrorZ;
+int accAngleX;
+int accAngleY;
+
+int16_t AccX;
+int16_t AccY;
+int16_t AccZ;
+int16_t GyroX;
+int16_t GyroY;
+int16_t GyroZ;
 
 int write_to_uart(char *data)
 {
@@ -101,6 +107,7 @@ void main()
 
   bmp280Available = init_bmp280();
   //bme280Available = init_bme280(); // no code available yet
+  mpu6050Available = mpu6050_init();
 
   setAlarmEveryMinute(); // not yet working
 
@@ -136,6 +143,7 @@ void main()
     write_to_uart(buf);
     printf(buf);
     for (int i=0; i< 16; i++) { buf[i] = 0x00; }
+    printf("wait 3 seconds or something\n");
     delay_loop(3000, 3000);
 
     if (bmp280Available == 0 ) {
@@ -157,35 +165,46 @@ void main()
         printf("Temperature read failed.\n");
       }
     }
+    else
+    {
+      // try to initialize again
+      bmp280Available = init_bmp280();
+    }
  
-    mpu6050_measuring_value(&mpu6050buffer);
-    //printf("AccErrorX: %d\n",AccErrorX);
-    //printf("AccErrorY: %d\n",AccErrorY);
-    //printf("GyroErrorX: %d\n",GyroErrorX);
-    //printf("GyroErrorY: %d\n",GyroErrorY);
-    //printf("GyroErrorZ %d\r",GyroErrorZ); 
+    if ( mpu6050Available == 0 ){
+      printf("Get mpu6050 data\n");
+      //calculate_imu_error(&GyroX, &GyroY, &GyroZ, &accAngleX, &accAngleY);
+  
+      //printf("accAngleX: %d\n", accAngleX);
+      //printf("accAngleY: %d\n", accAngleY);
+  
+      //printf("GyroX: %d\n", GyroX);
+      //printf("GyroY: %d\n", GyroY);
+      //printf("GyroZ: %d\n", GyroZ);
 
-    printf("AccX: %x\n", (mpu6050buffer[0]<<8 |mpu6050buffer[1])  );
-    printf("AccY: %x\n", (mpu6050buffer[2]<<8 |mpu6050buffer[3])  );
-    printf("AccZ: %x\n", (mpu6050buffer[4]<<8 |mpu6050buffer[5])  );
+      mpu6050_measuring_value(&readbuf);
+      AccX = (readbuf[0]<<8 |readbuf[1]);
+      AccY = (readbuf[2]<<8 |readbuf[3]);
+      AccZ = (readbuf[4]<<8 |readbuf[5]);
 
-    printf("GyroX: %x\n", (mpu6050buffer[8]<<8 |mpu6050buffer[9]) );
-    printf("GyroY: %x\n", (mpu6050buffer[10]<<8 |mpu6050buffer[11]) );
-    printf("GyroZ: %x\n", (mpu6050buffer[12]<<8 |mpu6050buffer[13]) );
+      GyroX = (readbuf[8]<<8 |readbuf[9]);
+      GyroY = (readbuf[10]<<8 |readbuf[11]);
+      GyroZ = (readbuf[12]<<8 |readbuf[13]);
 
-    AccX = (mpu6050buffer[0]<<8 |mpu6050buffer[1]) / 4096; //16-bit X-axis data
-    AccY = (mpu6050buffer[2]<<8 |mpu6050buffer[3]) / 4096; //16-bit Y-axis data
-    AccZ = (mpu6050buffer[4]<<8 |mpu6050buffer[5]) / 4096; //16-bit Z-axis data
+      printf("AccX: %d\n", AccX);
+      printf("AccY: %d\n", AccY);
+      printf("AccZ: %d\n", AccZ);
 
-    GyroX = (mpu6050buffer[8]<<8 |mpu6050buffer[9]) / 65.5 ;
-    GyroY = (mpu6050buffer[10]<<8 |mpu6050buffer[11]) / 65.5;
-    GyroZ = (mpu6050buffer[12]<<8 |mpu6050buffer[13]) / 65.5;
-
-    // Correct the outputs with the calculated error values
-    GyroX = GyroX + GyroErrorX ;   // GyroErrorX
-    GyroY = GyroY - GyroErrorY;    // GyroErrorY
-    GyroZ = GyroZ + GyroErrorZ;    // GyroErrorZ
-
+      printf("GyroX: %d\n", GyroX);
+      printf("GyroY: %d\n", GyroY);
+      printf("GyroZ: %d\n", GyroZ);
+  
+    }
+    else
+    {
+      // try to initialize again
+      mpu6050Available = mpu6050_init();
+    }
 
     //sprintf(buf, "Msg num: %d\n", cnt);
 

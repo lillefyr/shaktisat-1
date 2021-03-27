@@ -188,8 +188,12 @@ int init_bmp280() {
   {
     if (0x58 != tempReadValue)
     {
-      printf("BME280 not detected\n");
+      printf("BMP280 not detected\n");
       return -1;
+    }
+    else
+    {
+      printf("BMP280 detected\n");
     }
   }
     

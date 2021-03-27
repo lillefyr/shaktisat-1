@@ -121,9 +121,10 @@ void setAlarmEveryMinute() {
   //read_buf[5] //month
   //read_buf[6] //(year % 100) 
   
-  printf ("%x %x %x %d\n", read_buf[2], read_buf[1], read_buf[0], 59);
-//  read_buf[0] = 59;
-//  write_ds3231_registers(I2C, DS3231M_CONTROL, &read_buf[0], 1, 1000);
+  read_buf[0] = 0x59;
+  printf ("Alarm is being set to Hour %x Minute %x Second %x\n", read_buf[2], read_buf[1], read_buf[0]);
+
+  write_ds3231_registers(I2C, DS3231M_CONTROL, &read_buf[0], 1, 1000);
   write_ds3231_registers(I2C, DS3231M_CONTROL, &read_buf[1], 1, 1000);
   write_ds3231_registers(I2C, DS3231M_CONTROL, &read_buf[2], 1, 1000);
 
