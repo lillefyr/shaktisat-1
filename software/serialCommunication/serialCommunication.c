@@ -191,14 +191,17 @@ void main()
       GyroY = (readbuf[10]<<8 |readbuf[11]);
       GyroZ = (readbuf[12]<<8 |readbuf[13]);
 
-      printf("AccX: %d\n", AccX);
-      printf("AccY: %d\n", AccY);
-      printf("AccZ: %d\n", AccZ);
+      //printf("AccX: %d\n", AccX);
+      //printf("AccY: %d\n", AccY);
+      //printf("AccZ: %d\n", AccZ);
 
-      printf("GyroX: %d\n", GyroX);
-      printf("GyroY: %d\n", GyroY);
-      printf("GyroZ: %d\n", GyroZ);
-  
+      //printf("GyroX: %d\n", GyroX);
+      //printf("GyroY: %d\n", GyroY);
+      //printf("GyroZ: %d\n", GyroZ);
+ 
+      sprintf(buf, "AccX: %d\tAccY: %d\tAccZ: %d\tGyroX: %d\tGyroY: %d\tGyroZ: %d\n", AccX, AccY, AccZ, GyroX, GyroY, GyroZ);
+      write_to_uart(buf);
+      printf(buf);
     }
     else
     {
