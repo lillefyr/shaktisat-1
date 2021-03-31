@@ -25,7 +25,11 @@ DEBUG ?=
 MARCH ?= rv32imac
 MABI  ?= ilp32
 XLEN  ?= 32
-FLAGS ?=
+FLAGS ?= -D pinaka
+bspinc ?= $(HOME)/REPO/shaktiproject/software/shakti-sdk/bsp/include
+bspdri ?= $(HOME)/REPO/shaktiproject/software/shakti-sdk/bsp/drivers
+bspboard ?= $(HOME)/REPO/shaktiproject/software/shakti-sdk/bsp/third_party/pinaka
+GENLIB ?= $(HOME)/REPO/shaktiproject/software/shakti-sdk/software/examples
 
 all: create_dir
 	make amg88xx.riscv
@@ -34,7 +38,6 @@ amg88xx.riscv: create_dir
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf  -I$(bspinc) -I$(bspdri) -I$(bspboard) $(FLAGS) -c ./amg88xx.cpp -o ./output/amg88xx.o -lm -lgcc
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf  -I$(bspinc) -I$(bspdri) -I$(bspboard) $(FLAGS) -c ./Adafruit_AMG88xx.cpp -o ./output/Adafruit_AMG88xx.cpp.o -lm -lgcc
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf  -I$(bspinc) -I$(bspdri) -I$(bspboard) $(FLAGS) -c ./Wire.cpp -o ./output/Wire.o -lm -lgcc
-
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -T  $(bspboard)/link.ld ./output/amg88xx.o ./output/Adafruit_AMG88xx.cpp.o ./output/Wire.o $(GENLIB)/gen_lib/libshakti$(XLEN).a  -o ./output/amg88xx.shakti -static -nostartfiles -lm -lgcc
 	@riscv$(XLEN)-unknown-elf-objdump -D ./output/$(PROGRAM).shakti > ./output/$(PROGRAM).dump
 

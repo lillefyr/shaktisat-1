@@ -1,0 +1,32 @@
+make amg88xx.riscv
+
+riscv32-unknown-elf-gcc -march=rv32imac -mabi=ilp32 -T /home/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/third_party/pinaka/link.ld ./output/amg88xx.o ./output/Adafruit_AMG88xx.cpp.o ./output/Wire.o /home/asbjorn/REPO/shaktiproject/software/shakti-sdk/software/examples//gen_lib/libshakti32.a -o ./output/amg88xx.shakti -static -nostartfiles -lm -lgcc
+riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -T $(bspboard)/link.ld ./output/amg88xx.o ./output/Adafruit_AMG88xx.cpp.o ./output/Wire.o $(GENLIB)/gen_lib/libshakti$(XLEN).a  -o ./output/amg88xx.shakti -static -nostartfiles -lm -lgcc
+
+
+SHELL := /bin/bash # Use bash syntax
+DC ?=-D pinaka
+PROGRAM ?=amg88xx
+#default target board
+TARGET ?= artix7_35t
+DEBUG ?=
+MARCH ?= rv32imac
+MABI  ?= ilp32
+XLEN  ?= 32
+FLAGS ?= -D pinaka
+bspinc ?= ~/REPO/shaktiproject/software/shakti-sdk/bsp/include
+bspdri ?= ~/REPO/shaktiproject/software/shakti-sdk/bsp/drivers
+bspboard ?= ~/REPO/shaktiproject/software/shakti-sdk/bsp/third_party/pinaka
+GENLIB ?= ~/REPO/shaktiproject/software/shakti-sdk/software/examples
+
+	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -T  $(bspboard)/link.ld ./output/amg88xx.o ./output/Adafruit_AMG88xx.cpp.o ./output/Wire.o $(GENLIB)/gen_lib/libshakti$(XLEN).a  -o ./output/amg88xx.shakti -static -nostartfiles -lm -lgcc
+	@riscv$(XLEN)-unknown-elf-objdump -D ./output/$(PROGRAM).shakti > ./output/$(PROGRAM).dump
+
+create_dir:
+	@mkdir -p ./output
+
+
+riscv32-unknown-elf-gcc -march=rv32imac -mabi=ilp32 -w -D pinaka -mcmodel=medany -static -std=gnu99 -fno-builtin-printf  -I/home/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/include -I/home/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/drivers -Ihome/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/third_party/pinaka -D pinaka -c ./amg88xx.cpp -o ./output/amg88xx.o -lm -lgcc
+
+riscv32-unknown-elf-gcc -march=rv32imac -mabi=ilp32 -w -D pinaka -mcmodel=medany -static -std=gnu99 -fno-builtin-printf -I/home/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/include -I/home/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/drivers -I/home/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/third_party/pinaka -D pinaka -c ./Adafruit_AMG88xx.cpp -o ./output/Adafruit_AMG88xx.cpp.o -lm -lgcc
+riscv32-unknown-elf-gcc -march=rv32imac -mabi=ilp32 -w -D pinaka -mcmodel=medany -static -std=gnu99 -fno-builtin-printf  -I/home/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/include -I/home/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/drivers -Ihome/asbjorn/REPO/shaktiproject/software/shakti-sdk/bsp/third_party/pinaka -D pinaka -c ./Adafruit_AMG88xx.cpp -o ./output/Adafruit_AMG88xx.cpp.o -lm -lgcc
