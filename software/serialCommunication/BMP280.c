@@ -175,7 +175,7 @@ int write_bmp280_register(i2c_struct * i2c_instance, unsigned int reg_offset, un
   return 0;
 }
 
-int init_bmp280() {
+int bmp280_init() {
   int timeout;
   unsigned int tempReadValue = 0;
   unsigned long pressure = 0, temperature = 0;

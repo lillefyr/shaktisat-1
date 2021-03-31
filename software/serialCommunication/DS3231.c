@@ -57,7 +57,7 @@ int write_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, u
   return 0;
 }
 
-int initDS3231(){
+int DS3231_init(){
 
   i2c_init();
 

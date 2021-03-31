@@ -21,7 +21,7 @@
 #define  DS3231M_AGING              0x10       // DS3231 AGING       Register Address
 #define  DS3231M_TEMPERATURE        0x11       // DS3231 TEMPERATURE Register Address
 
-int initDS3231();
+int DS3231_init();
 int readDS3231(char * read_buf);
 int updateDS3231Time( unsigned int hour, unsigned int minute, unsigned int second,
                       unsigned int date, unsigned int month, unsigned int year);
