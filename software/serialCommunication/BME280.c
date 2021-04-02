@@ -1,2 +1,2 @@
 int getDataFromBME280(){}
-int bme280_init(){ return 1; }
+int bme280_init(){ printf("bme280_init\n"); return 1; }

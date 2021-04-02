@@ -1,24 +1,333 @@
-#include "uart.h"
+#include "uart.h" //Includes the definitions of uart communication protocol//
+#include "string.h"
 #include "pinmux.h"
+#include "log.h"
+
+#include "common.h"
+#include "MPU6050.h"
+#include "HMC5883.h"
+#include "BME280.h"
+#include "BMP280.h"
+#include "DS3231.h"
+
+#define OK 0
+#define OVERFLOW -1
 
 #define SoftSerial uart_instance[1]
 
-void main() {
-  unsigned int baudrate = 4800; // good 38400, fail 19200, fail 9600
+char uplinkedCommand[200];
+char downlinkData[200];
+unsigned int read_buf[7] = {0x00};
+unsigned int hour, minute, second, day, month, year;
+char ch;
+int  cnt=0;
+int  returnCode;
 
-  *pinmux_config_reg = 0x05;
+int8_t bmp280Available = -1;
+int8_t bme280Available = -1;
+int8_t mpu6050Available = -1;
+int8_t hmc5883Available = -1;
 
-  printf("Set baudrate to %d\n", baudrate);
-  set_baud_rate(SoftSerial, baudrate);
+unsigned int tempReadValue = 0;
+unsigned long pressure = 0, temperature = 0;
 
-  delay_loop(1000, 1000);
+//  Gyro
+char readbuf[20];
+int GyroErrorX, GyroErrorY, GyroErrorZ;
+int accAngleX;
+int accAngleY;
 
-  printf("Write one character to uart\n");
-  write_uart_character(SoftSerial, 'A');
+int16_t AccX;
+int16_t AccY;
+int16_t AccZ;
+int16_t GyroX;
+int16_t GyroY;
+int16_t GyroZ;
 
-  printf("Working at %d baud\n", baudrate);
-  while(1){
-    delay_loop(1000, 1000);
+int16_t averageAccX;
+int16_t averageAccY;
+int16_t averageAccZ;
+int16_t averageGyroX;
+int16_t averageGyroY;
+int16_t averageGyroZ;
+
+uint8_t firsttime = 0;
+
+int8_t shaktiCommand = -1;
+
+int write_to_uart(char *data) {
+  printf(data);
+  flush_uart(SoftSerial);
+  int i = 0;
+  while (*data != '\n') {
+    write_uart_character(SoftSerial, *data);
+    data++;
   }
+  write_uart_character(SoftSerial, '\n');
 }
 
+int read_from_uart(char *data) {
+  char ch;
+  uint8_t retries=0;
+  char *str = data;
+  for (int i = 0; i < 199; i++)
+  {
+    // blocking read. We will get a kick from GS every minute
+    // should really be unblocking read, but it is not implemented in the library
+    // uart buffer contains 16 char
+    read_uart_character(SoftSerial, &ch);
+
+    if ( ch == 0x00 ) { ch = '\n'; }
+
+    if ((( ch >= 0x20 ) && ( ch < 0x7F )) || ( ch == '\n' )) {
+      if ( ch == '\n' ) { return OK; }
+      //printf("%c ",ch);
+      *str = ch;
+      str++;
+    }    
+  }
+  return OVERFLOW;
+}
+
+//////// DS3231 SET TIME ////////////////
+void setDS3231Time(){
+  // ID:31;yy,mm,dd,hh,MM,ss
+  // yy year (2 digit) 6,7
+  // mm month          9,10
+  // dd day            12,13
+  // hh hour           15,16
+  // MM minute         18,19
+  // ss second         21,22
+
+  year =   ((uplinkedCommand[6]  - 0x30) * 10) + uplinkedCommand[7] - 0x30;
+  month =  ((uplinkedCommand[9]  - 0x30) * 10) + uplinkedCommand[10] - 0x30;
+  day =    ((uplinkedCommand[12] - 0x30) * 10) + uplinkedCommand[13] - 0x30;
+  hour =   ((uplinkedCommand[15] - 0x30) * 10) + uplinkedCommand[16] - 0x30;
+  minute = ((uplinkedCommand[18] - 0x30) * 10) + uplinkedCommand[19] - 0x30;
+  second = ((uplinkedCommand[21] - 0x30) * 10) + uplinkedCommand[22] - 0x30;
+    
+  // updateDS3231Time( hour, minute, second, day, month, year);
+}
+//////// DS3231 SET TIME ////////////////
+
+
+//////// QMC5833 / HMC5833 //////////////
+void sendHMC5883Data(){
+  getDataFromHMC5883();
+  for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+  sprintf(downlinkData, "ID:30;HMC5883 not implemented\n");
+  write_to_uart(downlinkData);  // downlink PONG
+  printf(downlinkData);
+}
+//////// QMC5833 / HMC5833 //////////////
+
+//////// BoardTemperature //////////////
+void sendBoardTemperature(){
+  for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+  sprintf(downlinkData, "ID:30;Boardtemp not implemented\n"); // max length of message!!!
+  write_to_uart(downlinkData);  // downlink PONG
+  printf(downlinkData);
+}
+//////// BoardTemperature //////////////
+
+//////// Status //////////////
+void sendStatus(){
+  for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+  sprintf(downlinkData, "ID:30;status not implemented\n");
+  write_to_uart(downlinkData);  // downlink PONG
+  printf(downlinkData);
+}
+//////// BoardTemperature //////////////
+
+//////// Send PONG //////////////////////
+void sendPONG(){
+  for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+  sprintf(downlinkData, "ID:20;PONG\n");
+  write_to_uart(downlinkData);  // downlink PONG
+  printf(downlinkData);
+}
+//////// Send PONG //////////////////////
+
+//////// DS3231 /////////////////////////
+void sendDS3231Time(){
+  printf("read date and time\n");
+  readDS3231(&read_buf);
+  for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+  sprintf(downlinkData, "ID:21;%x,%x,%x,%x,%x,%x\n",
+        read_buf[6], read_buf[5], read_buf[4], read_buf[2], read_buf[1], read_buf[0]);
+
+  write_to_uart(downlinkData);  // downlink date and time
+  printf(downlinkData);
+}
+//////// DS3231 /////////////////////////
+
+//////// BMP280 /////////////////////////
+void sendBMP280Data(){
+  printf("read pressure and temp\n");
+  if (bmp280Available == 1 ) {
+    // try to initialize again
+    bmp280Available = bmp280_init();
+  }
+
+  for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+  if (bmp280Available == 0 ) {
+    write_bmp280_register(I2C, BMP280_CTRL_MEANS, BMP280_NORMAL_MODE, 1000);     // Set it to NORMAL MODE
+    if(read_bmp280_register(I2C, BMP280_STATUS_REGISTER, &tempReadValue, 1000) == 0) {
+      if(!(tempReadValue & 0x9)) {
+        //Read pressure and temperature values.
+        read_bmp280_values(I2C, 0xF7, &pressure, &temperature, 1000);
+
+        sprintf(downlinkData, "ID22;%d,%d\n", pressure, temperature);
+      }
+      else
+      {
+        sprintf(downlinkData, "ID:30;BMP280 read failed (1)\n");
+        bmp280Available = 1; // try to reconnect again
+      }
+    }
+    else
+    {
+      //Display the error
+      sprintf(downlinkData, "ID:30;BMP280 read failed (2)\n");
+      bmp280Available = 1; // try to reconnect again
+    }
+  }
+  else
+  {
+    //Display the error
+    sprintf(downlinkData, "ID:30;BMP280 read failed (3)\n");
+    bmp280Available = 1; // try to reconnect again
+  }
+  write_to_uart(downlinkData);
+  printf(downlinkData);
+}
+//////// BMP280 /////////////////////////
+ 
+//////// MPU6050 /////////////////////////
+void sendMPU6050Data(){
+  printf("Read acceleration and gyro\n");
+  if ( mpu6050Available == 1 ){
+    // try to initialize again
+    mpu6050Available = mpu6050_init();
+  }
+
+  for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+  if ( mpu6050Available == 0 ){
+    mpu6050_measuring_value(&readbuf);
+    AccX = (readbuf[0]<<8 |readbuf[1]);
+    AccY = (readbuf[2]<<8 |readbuf[3]);
+    AccZ = (readbuf[4]<<8 |readbuf[5]);
+    GyroX = (readbuf[8]<<8 |readbuf[9]);
+    GyroY = (readbuf[10]<<8 |readbuf[11]);
+    GyroZ = (readbuf[12]<<8 |readbuf[13]);
+
+    sprintf(downlinkData, "ID:23;%d,%d,%d,%d,%d,%d\n", AccX, AccY, AccZ, GyroX, GyroY, GyroZ);
+  }
+  else
+  {
+    sprintf(downlinkData, "ID:30;MPU6050 failure\n");
+  }
+  write_to_uart(downlinkData);
+  printf(downlinkData);
+}
+//////// MPU6050 /////////////////////////
+
+void main() {
+  *pinmux_config_reg = 0x05;
+
+  // set GPIO2 to interrupt pin
+  // set GPIO3 to digital out for LED
+  // attachInterrupt(digitalPinToInterrupt(2), setFlag, CHANGE);
+
+  set_baud_rate(SoftSerial, 9600);
+  delay_loop(1000, 1000);
+
+  sprintf(downlinkData, "ID:30;Hello from Shakti\n");
+  write_to_uart(downlinkData);  // downlink PONG
+  delay_loop(1000, 1000);
+
+  // I2C init for all devices (except soft I2C)
+  printf("i2c init\n");
+  i2c_init();
+
+  //Initialises I2C Controller
+  if(config_i2c(I2C, PRESCALER_COUNT,SCLK_COUNT))
+  {
+    printf("Error in I2c initialization, stopping\n");
+    return -1;
+  }
+  printf("I2C Intilized\n");
+
+  // updateDS3231Time( 19, 35, 00, 21, 03, 2021);
+
+  bmp280Available = bmp280_init();
+  bme280Available = bme280_init(); // no code available yet
+  mpu6050Available = mpu6050_init();
+  hmc5883Available = hmc5883_init(); // no code available yet
+
+//  setAlarmEveryMinute(); // not yet working
+
+  while (1)
+  {
+    // read command from GS ( in 16 byte pieces )
+    // this do read non blocking. Not implemented in uart library
+    // \n is end of line marker
+    // read uplinkedCommand from uart. 16 or less chars
+    for (uint8_t i=0; i< 200; i++) { uplinkedCommand[i] = 0x00; }
+    //returnCode = read_from_uart(uplinkedCommand);
+    returnCode = 123;
+
+    // \n found, end of command
+    if ( returnCode == OK ){ 
+      printf("Command for shakti: %s\n",uplinkedCommand);
+      shaktiCommand = -1;
+      if ((uplinkedCommand[0] == 'I') && (uplinkedCommand[1] == 'D') && (uplinkedCommand[2] == ':')){
+         shaktiCommand = ((uplinkedCommand[3]  - 0x30) * 10) + uplinkedCommand[4] - 0x30;
+      }
+    }
+
+    // no \n found so probably bad uplinkedCommand
+    if ( returnCode == OVERFLOW ){ 
+      printf("OVERFLOW: <%s>\n",uplinkedCommand);
+    }
+
+    // get daea for downlink
+
+    switch ( shaktiCommand ){
+      case 0x00:
+        sendPONG();
+        break;
+
+      case 0x01:
+        sendDS3231Time();
+        break;
+
+      case 0x02:
+        sendBMP280Data();
+        break;
+
+      case 0x03:
+        sendMPU6050Data();
+        break;
+
+      case 0x04:
+        sendHMC5883Data();
+        break;
+
+      case 0x05:
+        sendBoardTemperature();
+        break;
+
+      case 0x10:
+        sendStatus();
+        break;
+
+      default:
+        break;
+    }
+
+    delay_loop(3000, 3000);
+    sprintf(downlinkData, "ID:30;Hello from Shaktisat\n");
+    write_to_uart(downlinkData);  // downlink PONG
+  }
+}

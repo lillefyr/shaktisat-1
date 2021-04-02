@@ -2,7 +2,7 @@ cp * ~/REPO/shaktiproject/shaktisat-1/software/serialCommunication/
 cd ~/REPO/shaktiproject/shaktisat-1/software/serialCommunication/
 git pull
 git add *
-if [ "$1" == "" }
+if [ "$1" == "" ]
 then
 git commit -m "Copy of serialCommunication `date`"
 else

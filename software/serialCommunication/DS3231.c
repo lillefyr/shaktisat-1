@@ -14,16 +14,19 @@ int read_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, un
 
 //Writes the slave address for write
   ret = i2c_send_slave_address(i2c_instance, DS3231_SLAVE_ADDRESS, I2C_WRITE, 800);
-//  printf("send slave address 0x%x return = %d\n", DS3231_SLAVE_ADDRESS, ret);
+  printf("send slave address 0x%x return = %d\n", DS3231_SLAVE_ADDRESS, ret);
+  if ( ret != 0 ) { return ret; }
 
 //Writes the pointer to address that needs to be read
   ret = i2c_write_data(i2c_instance, reg_offset, delay);
+  if ( ret != 0 ) { return ret; }
 
 //Stops the I2C transaction to start reading the temperature value.
   i2c_instance->control = I2C_STOP;
 
 //Writes the slave address for read
   ret = i2c_send_slave_address(i2c_instance, DS3231_SLAVE_ADDRESS, I2C_READ, 800);
+  if ( ret != 0 ) { return ret; }
 
   temp = 0;
 /* Make a dummy read as per spec of the I2C controller */
@@ -58,6 +61,7 @@ int write_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, u
 }
 
 int DS3231_init(){
+  printf("DS3231_init\n");
 
   i2c_init();
 

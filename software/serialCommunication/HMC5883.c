@@ -1,2 +1,2 @@
 int getDataFromHMC5883(){}
-int hmc5883_init(){ return 1; }
+int hmc5883_init(){ printf("hmc5883_init\n"); return 1; }

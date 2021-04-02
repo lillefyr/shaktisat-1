@@ -164,14 +164,21 @@ short read_bmp280_values16(i2c_struct * i2c_instance, unsigned int reg_offset, u
 }
 
 int write_bmp280_register(i2c_struct * i2c_instance, unsigned int reg_offset, unsigned char write_value, unsigned long delay) {
-  int i = 0, j = 0, k = 0, status=0;
-  unsigned int temp = 0;
-  i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_WRITE, 1000);
-  i2c_write_data(i2c_instance, reg_offset , 1000);
-  i2c_write_data(i2c_instance, write_value , 1000);
+  int ret=0;
+  ret = i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_WRITE, 1000);
+  if ( ret != 0 ) { return ret; }
+
+  ret = i2c_write_data(i2c_instance, reg_offset , 1000);
+  if ( ret != 0 ) { return ret; }
+
+  ret = i2c_write_data(i2c_instance, write_value , 1000);
+  if ( ret != 0 ) { return ret; }
+
 
 //Stops the I2C transaction to start reading the temperature value.
-  i2c_instance->control = I2C_STOP;
+  ret = i2c_instance->control = I2C_STOP;
+  if ( ret != 0 ) { return ret; }
+
   return 0;
 }
 
@@ -180,14 +187,18 @@ int bmp280_init() {
   unsigned int tempReadValue = 0;
   unsigned long pressure = 0, temperature = 0;
   int len;
+  int ret;
+  printf("bmp280_init\n");
 
-  write_bmp280_register(I2C, BMP280_CONFIG_REGISTER, 0xC0, 1000);
-  write_bmp280_register(I2C, BMP280_CTRL_MEANS, 0x27, 1000);
+  ret = write_bmp280_register(I2C, BMP280_CONFIG_REGISTER, 0xC0, 1000);
+  if ( ret != 0 ) { return ret; }
 
-  if(0 == read_bmp280_register(I2C, 0xD0, &tempReadValue, 1000))
-  {
-    if (0x58 != tempReadValue)
-    {
+  ret = write_bmp280_register(I2C, BMP280_CTRL_MEANS, 0x27, 1000);
+  if ( ret != 0 ) { return ret; }
+
+
+  if(0 == read_bmp280_register(I2C, 0xD0, &tempReadValue, 1000)) {
+    if (0x58 != tempReadValue) {
       printf("BMP280 not detected\n");
       return -1;
     }
@@ -197,8 +208,11 @@ int bmp280_init() {
     }
   }
     
-  write_bmp280_register(I2C, BMP280_RESET_REGISTER, 0xB6, 1000);
-  read_bmp280_register(I2C, BMP280_RESET_REGISTER, &tempReadValue, 1000);
+  ret = write_bmp280_register(I2C, BMP280_RESET_REGISTER, 0xB6, 1000);
+  if ( ret != 0 ) { return ret; }
+
+  ret = read_bmp280_register(I2C, BMP280_RESET_REGISTER, &tempReadValue, 1000);
+  if ( ret != 0 ) { return ret; }
   
   bmp280_calib_dig_T1 = read_bmp280_values16(I2C, BMP280_REG_DIG_T1, 1000);
   bmp280_calib_dig_T2 = read_bmp280_values16(I2C, BMP280_REG_DIG_T2, 1000);
