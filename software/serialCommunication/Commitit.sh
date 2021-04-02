@@ -11,6 +11,6 @@ fi
 git push
 
 echo "now go to macmini"
-echo "cd /Users/asbjorn/arduino/REPO/sdey76/filetransfer/adventure/shaktisat1/software/serialCommunication"
+echo "cd /Users/asbjorn/arduino/REPO/sdey76/filetransfer/adventure/shaktisat1/software"
 
 echo "./refreshAndPush.sh"

@@ -2,6 +2,7 @@
 #include "string.h"
 #include "pinmux.h"
 #include "log.h"
+#include "gpio_i2c.h"
 
 #include "common.h"
 #include "MPU6050.h"
@@ -13,12 +14,12 @@
 #define OK 0
 #define OVERFLOW -1
 
-#define SoftSerial uart_instance[1]
+#define HC12_UART uart_instance[1] // HC 12 RX TX, GPIO 0,1
+#define GPS_UART uart_instance[2] // GPS RX TX GPIO 2, 3
 
 char uplinkedCommand[200];
 char downlinkData[200];
 unsigned int read_buf[7] = {0x00};
-unsigned int hour, minute, second, day, month, year;
 char ch;
 int  cnt=0;
 int  returnCode;
@@ -55,18 +56,20 @@ uint8_t firsttime = 0;
 
 int8_t shaktiCommand = -1;
 
+int16_t msgcnt = 0;
+
 int write_to_uart(char *data) {
   printf(data);
-  flush_uart(SoftSerial);
+  flush_uart(HC12_UART);
   int i = 0;
   while (*data != '\n') {
-    write_uart_character(SoftSerial, *data);
+    write_uart_character(HC12_UART, *data);
     data++;
   }
-  write_uart_character(SoftSerial, '\n');
+  write_uart_character(HC12_UART, '\n');
 }
 
-int read_from_uart(char *data) {
+int read_from_uart(uart_struct *UART, char *data) {
   char ch;
   uint8_t retries=0;
   char *str = data;
@@ -75,7 +78,7 @@ int read_from_uart(char *data) {
     // blocking read. We will get a kick from GS every minute
     // should really be unblocking read, but it is not implemented in the library
     // uart buffer contains 16 char
-    read_uart_character(SoftSerial, &ch);
+    read_uart_character(UART, &ch);
 
     if ( ch == 0x00 ) { ch = '\n'; }
 
@@ -89,6 +92,22 @@ int read_from_uart(char *data) {
   return OVERFLOW;
 }
 
+
+//////// GPS ////////////////////////
+int sendGPSData() {
+  char GPSdata[100];
+  for (uint8_t i=0; i< 200; i++) { GPSdata[i] = 0x00; }
+  returnCode = read_from_uart(GPS_UART, &GPSdata);
+
+  // \n found, end of command
+  if ( returnCode == OK ){
+    printf("GPS data received: %s\n",GPSdata);
+  }else{
+    printf("NO GPS data received: %s\n",GPSdata);
+  }
+}
+//////// GPS ////////////////////////
+
 //////// DS3231 SET TIME ////////////////
 void setDS3231Time(){
   // ID:31;yy,mm,dd,hh,MM,ss
@@ -99,14 +118,15 @@ void setDS3231Time(){
   // MM minute         18,19
   // ss second         21,22
 
-  year =   ((uplinkedCommand[6]  - 0x30) * 10) + uplinkedCommand[7] - 0x30;
-  month =  ((uplinkedCommand[9]  - 0x30) * 10) + uplinkedCommand[10] - 0x30;
-  day =    ((uplinkedCommand[12] - 0x30) * 10) + uplinkedCommand[13] - 0x30;
-  hour =   ((uplinkedCommand[15] - 0x30) * 10) + uplinkedCommand[16] - 0x30;
-  minute = ((uplinkedCommand[18] - 0x30) * 10) + uplinkedCommand[19] - 0x30;
-  second = ((uplinkedCommand[21] - 0x30) * 10) + uplinkedCommand[22] - 0x30;
-    
-  // updateDS3231Time( hour, minute, second, day, month, year);
+  unsigned int year =   ((uplinkedCommand[6]  - 0x30) * 10) + uplinkedCommand[7] - 0x30;
+  unsigned int month =  ((uplinkedCommand[9]  - 0x30) * 10) + uplinkedCommand[10] - 0x30;
+  unsigned int day =    ((uplinkedCommand[12] - 0x30) * 10) + uplinkedCommand[13] - 0x30;
+  unsigned int hour =   ((uplinkedCommand[15] - 0x30) * 10) + uplinkedCommand[16] - 0x30;
+  unsigned int minute = ((uplinkedCommand[18] - 0x30) * 10) + uplinkedCommand[19] - 0x30;
+  unsigned int second = ((uplinkedCommand[21] - 0x30) * 10) + uplinkedCommand[22] - 0x30;
+
+  updateDS3231Time( hour, minute, second, day, month, year);
+  printf("Date set to 20%x/%x/%x %x:%x:%x\n", year, month, day, hour, minute, second);
 }
 //////// DS3231 SET TIME ////////////////
 
@@ -116,7 +136,7 @@ void sendHMC5883Data(){
   getDataFromHMC5883();
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:30;HMC5883 not implemented\n");
-  write_to_uart(downlinkData);  // downlink PONG
+  write_to_uart(downlinkData); 
   printf(downlinkData);
 }
 //////// QMC5833 / HMC5833 //////////////
@@ -125,7 +145,7 @@ void sendHMC5883Data(){
 void sendBoardTemperature(){
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:30;Boardtemp not implemented\n"); // max length of message!!!
-  write_to_uart(downlinkData);  // downlink PONG
+  write_to_uart(downlinkData);
   printf(downlinkData);
 }
 //////// BoardTemperature //////////////
@@ -134,7 +154,7 @@ void sendBoardTemperature(){
 void sendStatus(){
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:30;status not implemented\n");
-  write_to_uart(downlinkData);  // downlink PONG
+  write_to_uart(downlinkData);
   printf(downlinkData);
 }
 //////// BoardTemperature //////////////
@@ -233,13 +253,15 @@ void sendMPU6050Data(){
 //////// MPU6050 /////////////////////////
 
 void main() {
-  *pinmux_config_reg = 0x05;
+  *pinmux_config_reg = 0x0055;
 
   // set GPIO2 to interrupt pin
   // set GPIO3 to digital out for LED
   // attachInterrupt(digitalPinToInterrupt(2), setFlag, CHANGE);
 
-  set_baud_rate(SoftSerial, 9600);
+  set_baud_rate(HC12_UART, 9600);
+  set_baud_rate(GPS_UART, 9600);
+
   delay_loop(1000, 1000);
 
   sprintf(downlinkData, "ID:30;Hello from Shakti\n");
@@ -247,12 +269,12 @@ void main() {
   delay_loop(1000, 1000);
 
   // I2C init for all devices (except soft I2C)
-  printf("i2c init\n");
+  printf("i2c init: SCL is %x and expected %x, SDA is %x and expected %x\n", I2C_SCL, GPIO5, I2C_SDA, GPIO6);
+  printf("change in bsp/include/gpio_i2c.h\n");
   i2c_init();
 
   //Initialises I2C Controller
-  if(config_i2c(I2C, PRESCALER_COUNT,SCLK_COUNT))
-  {
+  if(config_i2c(I2C, PRESCALER_COUNT,SCLK_COUNT)) {
     printf("Error in I2c initialization, stopping\n");
     return -1;
   }
@@ -274,13 +296,12 @@ void main() {
     // \n is end of line marker
     // read uplinkedCommand from uart. 16 or less chars
     for (uint8_t i=0; i< 200; i++) { uplinkedCommand[i] = 0x00; }
-    //returnCode = read_from_uart(uplinkedCommand);
-    returnCode = 123;
+    returnCode = read_from_uart(HC12_UART, uplinkedCommand);
 
     // \n found, end of command
+    shaktiCommand = -1;
     if ( returnCode == OK ){ 
       printf("Command for shakti: %s\n",uplinkedCommand);
-      shaktiCommand = -1;
       if ((uplinkedCommand[0] == 'I') && (uplinkedCommand[1] == 'D') && (uplinkedCommand[2] == ':')){
          shaktiCommand = ((uplinkedCommand[3]  - 0x30) * 10) + uplinkedCommand[4] - 0x30;
       }
@@ -291,7 +312,11 @@ void main() {
       printf("OVERFLOW: <%s>\n",uplinkedCommand);
     }
 
-    // get daea for downlink
+    // get data for downlink
+    // temp entry
+    if (( shaktiCommand == -1 ) && ((msgcnt % 10 ) == 0)) {
+      shaktiCommand = 1;
+    }
 
     switch ( shaktiCommand ){
       case 0x00:
@@ -318,6 +343,10 @@ void main() {
         sendBoardTemperature();
         break;
 
+      case 0x09:;
+        sendGPSData();
+        break;
+
       case 0x10:
         sendStatus();
         break;
@@ -327,7 +356,8 @@ void main() {
     }
 
     delay_loop(3000, 3000);
-    sprintf(downlinkData, "ID:30;Hello from Shaktisat\n");
-    write_to_uart(downlinkData);  // downlink PONG
+    sprintf(downlinkData, "ID:30;Shaktisat %d\n", msgcnt);
+    write_to_uart(downlinkData);
+    msgcnt++;
   }
 }
