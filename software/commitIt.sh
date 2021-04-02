@@ -1,4 +1,4 @@
-cp ~/REPO/shaktiproject/software/shakti-sdk/software/examples/uart_applns/serialCommunication/* ~/REPO/shaktiproject/shaktisat-1/software/serialCommunication/
+cp ~/REPO/shaktiproject/software/shakti-sdk/software/examples/uart_applns/serialCommunication/*[ch] ~/REPO/shaktiproject/shaktisat-1/software/serialCommunication/
 cd ~/REPO/shaktiproject/shaktisat-1/software/
 git pull
 git add *
