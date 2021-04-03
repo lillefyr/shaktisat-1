@@ -5,8 +5,7 @@
 #include "common.h"
 #include "DS3231.h"
 
-int read_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, unsigned int *readTemp, unsigned char length, unsigned long delay)
-{
+int read_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, unsigned int *readTemp, unsigned char length, unsigned long delay) {
   unsigned char read_buf[4] = {'\0'};
   int i = 0, j = 0,  k = 0, status=0;
   unsigned char temp = 0;
@@ -15,7 +14,7 @@ int read_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, un
 //Writes the slave address for write
   ret = i2c_send_slave_address(i2c_instance, DS3231_SLAVE_ADDRESS, I2C_WRITE, 800);
   if ( ret != 0 ) {
-    printf("send slave address 0x%x return = %d\n", DS3231_SLAVE_ADDRESS, ret);
+    printf("send to slave address failed 0x%x return = %d\n", DS3231_SLAVE_ADDRESS, ret);
     return ret;
   }
 

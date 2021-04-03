@@ -132,7 +132,6 @@ void sendHMC5883Data(){
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:30;HMC5883 not implemented\n");
   write_to_uart(downlinkData); 
-  printf(downlinkData);
 }
 //////// QMC5833 / HMC5833 //////////////
 
@@ -164,7 +163,6 @@ void sendBoardTemperature(){
   //ID:05;38.913574,0.950683
   //0123456789012345678901234
   write_to_uart(downlinkData);
-  printf(downlinkData);
 }
 //////// BoardTemperature //////////////
 
@@ -173,7 +171,6 @@ void sendStatus(){
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:30;status not implemented\n");
   write_to_uart(downlinkData);
-  printf(downlinkData);
 }
 //////// BoardTemperature //////////////
 
@@ -182,7 +179,6 @@ void sendPONG(){
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:20;PONG\n");
   write_to_uart(downlinkData);  // downlink PONG
-  printf(downlinkData);
 }
 //////// Send PONG //////////////////////
 
@@ -194,7 +190,12 @@ void sendDS3231Time(){
     // try to initialize again
     ds3231Available = ds3231_init();
   }
-  if ( readDS3231(&read_buf) < 0 ) { ds3231Available = -1; return; } // bad data, skip
+  if ( readDS3231(&read_buf) < 0 ) {
+    sprintf(downlinkData, "ID:30;ds3231 error\n");
+    ds3231Available = -1;
+    return;
+  } // bad data, skip
+
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:21;%x,%x,%x,%x,%x,%x\n",
         read_buf[6], read_buf[5], read_buf[4], read_buf[2], read_buf[1], read_buf[0]);
@@ -210,7 +211,6 @@ void sendDS3231Time(){
   }
 
   write_to_uart(downlinkData);  // downlink onboard date and time
-  printf(downlinkData);
 }
 //////// DS3231 /////////////////////////
 
@@ -252,7 +252,6 @@ void sendBMP280Data(){
     bmp280Available = 1; // try to reconnect again
   }
   write_to_uart(downlinkData);
-  printf(downlinkData);
 }
 //////// BMP280 /////////////////////////
  
@@ -281,7 +280,6 @@ void sendMPU6050Data(){
     sprintf(downlinkData, "ID:30;MPU6050 failure\n");
   }
   write_to_uart(downlinkData);
-  printf(downlinkData);
 }
 //////// MPU6050 /////////////////////////
 
