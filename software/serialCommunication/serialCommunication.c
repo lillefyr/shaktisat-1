@@ -145,14 +145,32 @@ void sendHMC5883Data(){
 //////// BoardTemperature //////////////
 void sendBoardTemperature(){
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
-  sprintf(downlinkData, "ID:30;Boardtemp not implemented\n"); // max length of message!!!
 
-  //uint32_t value = xadc_read_data(0x41200);
-  //printf("temp value = %f\n", xadc_onchip_temp(value));
+  float temp = xadc_onchip_temp(xadc_read_data(0x41200));
+  //printf("temp=%f\n",temp);
+  float voltage = xadc_onchip_voltage(xadc_read_data(0x41204));
+  //printf("voltage=%f",voltage);
 
-  //value = xadc_read_data(0x41204);
-  //printf("volt value = %f\n", xadc_onchip_voltage(value));
+  char *tempSign = (temp < 0) ? "-" : "";
+  float tempVal = (temp < 0) ? -temp : temp;
+  int tempInt1 = tempVal;                  // Get the integer part
+  float tempFrac = tempVal - tempInt1;      // Get fraction part
+  int tempInt2 = trunc(tempFrac * 10000);  // Turn into integer
+  // Print as parts, note that you need 0-padding for fractional bit.
 
+  char *voltSign = (voltage < 0) ? "-" : "";
+  float voltVal = (voltage < 0) ? -voltage : voltage;
+  int voltInt1 = voltVal;                  // Get the integer part
+  float voltFrac = voltVal - voltInt1;      // Get fraction part
+  int voltInt2 = trunc(voltFrac * 10000);  // Turn into integer
+  // Print as parts, note that you need 0-padding for fractional bit.
+
+  sprintf (downlinkData, "ID:05;%s%d.%04d,%s%d.%04d\n", tempSign, tempInt1, tempInt2, voltSign, voltInt1, voltInt2);
+
+  //sprintf(downlinkData, "ID:30;status not implemented\n");
+  //sprintf(downlinkData, "ID:05;%f,%f\n", temp, voltage);
+  //ID:05;38.913574,0.950683
+  //0123456789012345678901234
   write_to_uart(downlinkData);
   printf(downlinkData);
 }
