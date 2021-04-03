@@ -49,11 +49,11 @@ int mpu6050_init() {
 
   printf("\nMPU6050 i2c Init completed\n");
 
-  int kurt = I2c_Read_byte(MPU6050_SLAVE_ADDRESS, DEV_IDENTITY_DATA_REG, 100);
-  if (DEV_IDENTITY == kurt) { //I2c_Read_byte(MPU6050_SLAVE_ADDRESS, DEV_IDENTITY_DATA_REG, 100)){
+  int device = I2c_Read_byte(MPU6050_SLAVE_ADDRESS, DEV_IDENTITY_DATA_REG, 100);
+  if (DEV_IDENTITY == device) { //I2c_Read_byte(MPU6050_SLAVE_ADDRESS, DEV_IDENTITY_DATA_REG, 100)){
     printf("MPU6050 SUCCESFULLY VERIFIED\n");
   } else{
-    printf("ERROR: MPU6050 identity not verified found ID=0x%x expected 0x%x\n",kurt, DEV_IDENTITY);
+    printf("ERROR: MPU6050 identity not verified found ID=0x%x expected 0x%x\n",device, DEV_IDENTITY);
     return -1;
   }
   //configuring power management register

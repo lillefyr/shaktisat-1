@@ -14,8 +14,10 @@ int read_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, un
 
 //Writes the slave address for write
   ret = i2c_send_slave_address(i2c_instance, DS3231_SLAVE_ADDRESS, I2C_WRITE, 800);
-  printf("send slave address 0x%x return = %d\n", DS3231_SLAVE_ADDRESS, ret);
-  if ( ret != 0 ) { return ret; }
+  if ( ret != 0 ) {
+    printf("send slave address 0x%x return = %d\n", DS3231_SLAVE_ADDRESS, ret);
+    return ret;
+  }
 
 //Writes the pointer to address that needs to be read
   ret = i2c_write_data(i2c_instance, reg_offset, delay);
@@ -60,8 +62,8 @@ int write_ds3231_registers(i2c_struct * i2c_instance, unsigned int reg_offset, u
   return 0;
 }
 
-int DS3231_init(){
-  printf("DS3231_init\n");
+int ds3231_init(){
+  printf("ds3231_init\n");
 
   i2c_init();
 
@@ -78,7 +80,7 @@ int DS3231_init(){
 
 //read the date and return it in read_buf
 int readDS3231(char * read_buf){
-  read_ds3231_registers(I2C, DS3231_REG_OFFSET, &read_buf[0], 7, 1000);
+  return read_ds3231_registers(I2C, DS3231_REG_OFFSET, &read_buf[0], 7, 1000);
 };
 
 //set the time on DS3231
@@ -102,7 +104,7 @@ int updateDS3231Time( unsigned int hour, unsigned int minute, unsigned int secon
   write_buf[6] = DS3231_DEC_TO_HEX((year % 100));
   length = 7;
 
-  write_ds3231_registers(I2C, 0x00, &write_buf[0], length, 1000);
+  return write_ds3231_registers(I2C, 0x00, &write_buf[0], length, 1000);
 }
 
 

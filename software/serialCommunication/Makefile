@@ -47,9 +47,12 @@ $(PROGRAM).riscv: create_dir
 
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c $(bspdri)/xadc/xadc_driver.c -o ../../gen_lib/xadc_driver.o -lm -lgcc
 
-	riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -I$(bsplib) -c ./$(PROGRAM).c -o ./output/$(PROGRAM).o -lm -lgcc
+	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c $(bspdri)/clint/clint_driver.c -o ../../gen_lib/clint_driver.o -lm -lgcc
+
+	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -I$(bsplib) -c ./$(PROGRAM).c -o ./output/$(PROGRAM).o -lm -lgcc
 
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -T  $(bspboard)/link.ld $(GENLIB)/gen_lib/libshakti$(XLEN).a ./output/$(PROGRAM).o ./output/MPU6050.o ./output/HMC5883.o ./output/BMP280.o ./output/BME280.o ./output/DS3231.o ../../gen_lib/i2c_driver.o ../../gen_lib/gpio_i2c.o ../../gen_lib/xadc_driver.o -o ./output/$(PROGRAM).shakti -static -nostartfiles -lm -lgcc
+#	../../gen_lib/clint_driver.o 
 
 	@riscv$(XLEN)-unknown-elf-objdump -D ./output/$(PROGRAM).shakti > ./output/$(PROGRAM).dump
 

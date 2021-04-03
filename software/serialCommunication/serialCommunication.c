@@ -1,3 +1,5 @@
+#include "traps.h"
+#include "clint_driver.h"
 #include "uart.h"
 #include "string.h"
 #include "pinmux.h"
@@ -20,40 +22,32 @@
 
 char uplinkedCommand[200];
 char downlinkData[200];
-unsigned int read_buf[7] = {0x00};
-char ch;
+//char ch;
 int  cnt=0;
-int  returnCode;
+int  commandLength;
+uint64_t timerValue;
+uint64_t oldTimerValue;
 
-int8_t bmp280Available = -1;
+int8_t ds3231Available = -1;
 int8_t bme280Available = -1;
-int8_t mpu6050Available = -1;
+int8_t bmp280Available = -1;
 int8_t hmc5883Available = -1;
+int8_t mpu6050Available = -1;
 
+// DS3231
+//
+unsigned int read_buf[7] = {0x00};
 unsigned int tempReadValue = 0;
 unsigned long pressure = 0, temperature = 0;
 
 //  Gyro
 char readbuf[20];
-int GyroErrorX, GyroErrorY, GyroErrorZ;
-int accAngleX;
-int accAngleY;
-
 int16_t AccX;
 int16_t AccY;
 int16_t AccZ;
 int16_t GyroX;
 int16_t GyroY;
 int16_t GyroZ;
-
-int16_t averageAccX;
-int16_t averageAccY;
-int16_t averageAccZ;
-int16_t averageGyroX;
-int16_t averageGyroY;
-int16_t averageGyroZ;
-
-uint8_t firsttime = 0;
 
 int8_t shaktiCommand = -1;
 
@@ -84,7 +78,7 @@ int read_from_uart(uart_struct *UART, char *data) {
     if ( ch == 0x00 ) { ch = '\n'; }
 
     if ((( ch >= 0x20 ) && ( ch < 0x7F )) || ( ch == '\n' )) {
-      if ( ch == '\n' ) { return OK; }
+      if ( ch == '\n' ) { return i; }
       //printf("%c ",ch);
       *str = ch;
       str++;
@@ -98,10 +92,10 @@ int read_from_uart(uart_struct *UART, char *data) {
 int sendGPSData() {
   char GPSdata[100];
   for (uint8_t i=0; i< 200; i++) { GPSdata[i] = 0x00; }
-  returnCode = read_from_uart(GPS_UART, &GPSdata);
+  commandLength = read_from_uart(GPS_UART, &GPSdata);
 
   // \n found, end of command
-  if ( returnCode == OK ){
+  if ( commandLength > 0 ){
     printf("GPS data received: %s\n",GPSdata);
   }else{
     printf("NO GPS data received: %s\n",GPSdata);
@@ -147,9 +141,7 @@ void sendBoardTemperature(){
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
 
   float temp = xadc_onchip_temp(xadc_read_data(0x41200));
-  //printf("temp=%f\n",temp);
   float voltage = xadc_onchip_voltage(xadc_read_data(0x41204));
-  //printf("voltage=%f",voltage);
 
   char *tempSign = (temp < 0) ? "-" : "";
   float tempVal = (temp < 0) ? -temp : temp;
@@ -194,15 +186,30 @@ void sendPONG(){
 }
 //////// Send PONG //////////////////////
 
+
 //////// DS3231 /////////////////////////
 void sendDS3231Time(){
-  printf("read date and time\n");
-  readDS3231(&read_buf);
+  printf("readD3231\n");
+  if (ds3231Available != 0 ) {
+    // try to initialize again
+    ds3231Available = ds3231_init();
+  }
+  if ( readDS3231(&read_buf) < 0 ) { ds3231Available = -1; return; } // bad data, skip
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:21;%x,%x,%x,%x,%x,%x\n",
         read_buf[6], read_buf[5], read_buf[4], read_buf[2], read_buf[1], read_buf[0]);
 
-  write_to_uart(downlinkData);  // downlink date and time
+  if ((read_buf[6] == 0xFF) 
+  || (read_buf[5] == 0xFF) 
+  || (read_buf[4] == 0xFF) 
+  || (read_buf[2] == 0xFF) 
+  || (read_buf[1] == 0xFF) 
+  || (read_buf[0] == 0xFF)){
+    // bad data, dont send
+    return;
+  }
+
+  write_to_uart(downlinkData);  // downlink onboard date and time
   printf(downlinkData);
 }
 //////// DS3231 /////////////////////////
@@ -281,17 +288,13 @@ void sendMPU6050Data(){
 void main() {
   *pinmux_config_reg = 0x0055;
 
-  // set GPIO2 to interrupt pin
-  // set GPIO3 to digital out for LED
-  // attachInterrupt(digitalPinToInterrupt(2), setFlag, CHANGE);
-
   set_baud_rate(HC12_UART, 9600);
   set_baud_rate(GPS_UART, 9600);
 
   delay_loop(1000, 1000);
 
-  sprintf(downlinkData, "ID:30;Hello from Shakti\n");
-  write_to_uart(downlinkData);  // downlink PONG
+  sprintf(downlinkData, "ID:30;ShaktiSat1 online\n");
+  write_to_uart(downlinkData);
   delay_loop(1000, 1000);
 
   // I2C init for all devices (except soft I2C)
@@ -308,12 +311,11 @@ void main() {
 
   // updateDS3231Time( 19, 35, 00, 21, 03, 2021);
 
+  ds3231Available = ds3231_init();
   bmp280Available = bmp280_init();
   bme280Available = bme280_init(); // no code available yet
   mpu6050Available = mpu6050_init();
   hmc5883Available = hmc5883_init(); // no code available yet
-
-//  setAlarmEveryMinute(); // not yet working
 
   while (1)
   {
@@ -322,11 +324,11 @@ void main() {
     // \n is end of line marker
     // read uplinkedCommand from uart. 16 or less chars
     for (uint8_t i=0; i< 200; i++) { uplinkedCommand[i] = 0x00; }
-    returnCode = read_from_uart(HC12_UART, uplinkedCommand);
+    commandLength = read_from_uart(HC12_UART, uplinkedCommand);
 
     // \n found, end of command
     shaktiCommand = -1;
-    if ( returnCode == OK ){ 
+    if ( commandLength > 0 ){ 
       printf("Command for shakti: %s\n",uplinkedCommand);
       if ((uplinkedCommand[0] == 'I') && (uplinkedCommand[1] == 'D') && (uplinkedCommand[2] == ':')){
          shaktiCommand = ((uplinkedCommand[3]  - 0x30) * 10) + uplinkedCommand[4] - 0x30;
@@ -334,14 +336,18 @@ void main() {
     }
 
     // no \n found so probably bad uplinkedCommand
-    if ( returnCode == OVERFLOW ){ 
+    if ( commandLength == OVERFLOW ){ 
       printf("OVERFLOW: <%s>\n",uplinkedCommand);
     }
 
     // get data for downlink
-    // temp entry
-    if (( shaktiCommand == -1 ) && ((msgcnt % 10 ) == 0)) {
-      shaktiCommand = 5;
+    // This is approx 40 seconds
+    timerValue = get_timer_value()/200000000;
+
+    if (( shaktiCommand == -1 ) && (oldTimerValue != timerValue)) {
+      shaktiCommand = 1;
+      oldTimerValue = timerValue;
+      printf("timervalue=%d\n", timerValue);
     }
 
     switch ( shaktiCommand ){
@@ -381,9 +387,9 @@ void main() {
         break;
     }
 
-    delay_loop(3000, 3000);
-    sprintf(downlinkData, "ID:30;Shaktisat %d\n", msgcnt);
-    write_to_uart(downlinkData);
+//    delay_loop(3000, 3000);
+//    sprintf(downlinkData, "ID:30;Shaktisat %d\n", msgcnt);
+//    write_to_uart(downlinkData);
     msgcnt++;
   }
 }
