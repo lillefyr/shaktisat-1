@@ -1,8 +1,9 @@
-#include "uart.h" //Includes the definitions of uart communication protocol//
+#include "uart.h"
 #include "string.h"
 #include "pinmux.h"
 #include "log.h"
 #include "gpio_i2c.h"
+#include "xadc_driver.h"
 
 #include "common.h"
 #include "MPU6050.h"
@@ -145,6 +146,13 @@ void sendHMC5883Data(){
 void sendBoardTemperature(){
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
   sprintf(downlinkData, "ID:30;Boardtemp not implemented\n"); // max length of message!!!
+
+  //uint32_t value = xadc_read_data(0x41200);
+  //printf("temp value = %f\n", xadc_onchip_temp(value));
+
+  //value = xadc_read_data(0x41204);
+  //printf("volt value = %f\n", xadc_onchip_voltage(value));
+
   write_to_uart(downlinkData);
   printf(downlinkData);
 }
@@ -315,7 +323,7 @@ void main() {
     // get data for downlink
     // temp entry
     if (( shaktiCommand == -1 ) && ((msgcnt % 10 ) == 0)) {
-      shaktiCommand = 1;
+      shaktiCommand = 5;
     }
 
     switch ( shaktiCommand ){
