@@ -91,15 +91,17 @@ int read_from_uart(uart_struct *UART, char *data) {
 //////// GPS ////////////////////////
 int sendGPSData() {
   char GPSdata[100];
-  for (uint8_t i=0; i< 200; i++) { GPSdata[i] = 0x00; }
+  for (uint8_t i=0; i< 100; i++) { GPSdata[i] = 0x00; }
+  printf("read from GPS UART\n");
   commandLength = read_from_uart(GPS_UART, &GPSdata);
 
   // \n found, end of command
   if ( commandLength > 0 ){
-    printf("GPS data received: %s\n",GPSdata);
+    sprintf(downlinkData, "ID:30;GPS data received: %s\n",GPSdata);
   }else{
-    printf("NO GPS data received: %s\n",GPSdata);
+    sprintf(downlinkData, "ID:30;NO GPS data received\n");
   }
+  write_to_uart(downlinkData); 
 }
 //////// GPS ////////////////////////
 
@@ -373,7 +375,7 @@ void main() {
         sendBoardTemperature();
         break;
 
-      case 0x09:;
+      case 0x09:
         sendGPSData();
         break;
 
