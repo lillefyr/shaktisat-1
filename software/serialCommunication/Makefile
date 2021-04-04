@@ -37,8 +37,6 @@ $(PROGRAM).riscv: create_dir
 
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c ./BMP280.c -o ./output/BMP280.o -lm -lgcc
 
-	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c ./BME280.c -o ./output/BME280.o -lm -lgcc
-
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(flags) -I$(bspboard) -I$(bspinc) -c ./DS3231.c -o ./output/DS3231.o -lm -lgcc
 
 	@riscv$(XLEN)-unknown-elf-gcc -march=$(MARCH) -mabi=$(MABI) -w $(DC) -mcmodel=medany -static -std=gnu99 -fno-builtin-printf $(FLAGS) -I$(bspboard) -I$(bspinc) -c $(bspdri)/i2c/i2c_driver.c -o ../../gen_lib/i2c_driver.o -lm -lgcc

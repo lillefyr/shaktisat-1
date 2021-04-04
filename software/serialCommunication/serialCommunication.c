@@ -10,7 +10,6 @@
 #include "common.h"
 #include "MPU6050.h"
 #include "HMC5883.h"
-#include "BME280.h"
 #include "BMP280.h"
 #include "DS3231.h"
 
@@ -29,7 +28,6 @@ uint64_t timerValue;
 uint64_t oldTimerValue;
 
 int8_t ds3231Available = -1;
-int8_t bme280Available = -1;
 int8_t bmp280Available = -1;
 int8_t hmc5883Available = -1;
 int8_t mpu6050Available = -1;
@@ -97,7 +95,7 @@ int sendGPSData() {
 
   // \n found, end of command
   if ( commandLength > 0 ){
-    sprintf(downlinkData, "ID:30;GPS data received: %s\n",GPSdata);
+    sprintf(downlinkData, "ID:30;%s\n",GPSdata);
   }else{
     sprintf(downlinkData, "ID:30;NO GPS data received\n");
   }
@@ -107,7 +105,7 @@ int sendGPSData() {
 
 //////// DS3231 SET TIME ////////////////
 void setDS3231Time(){
-  // ID:31;yy,mm,dd,hh,MM,ss
+  // ID:11;yy,mm,dd,hh,MM,ss
   // yy year (2 digit) 6,7
   // mm month          9,10
   // dd day            12,13
@@ -115,15 +113,15 @@ void setDS3231Time(){
   // MM minute         18,19
   // ss second         21,22
 
-  unsigned int year =   ((uplinkedCommand[6]  - 0x30) * 10) + uplinkedCommand[7] - 0x30;
-  unsigned int month =  ((uplinkedCommand[9]  - 0x30) * 10) + uplinkedCommand[10] - 0x30;
-  unsigned int day =    ((uplinkedCommand[12] - 0x30) * 10) + uplinkedCommand[13] - 0x30;
-  unsigned int hour =   ((uplinkedCommand[15] - 0x30) * 10) + uplinkedCommand[16] - 0x30;
-  unsigned int minute = ((uplinkedCommand[18] - 0x30) * 10) + uplinkedCommand[19] - 0x30;
-  unsigned int second = ((uplinkedCommand[21] - 0x30) * 10) + uplinkedCommand[22] - 0x30;
+  unsigned int year =   ((uplinkedCommand[6]  - 0x30) * 0x10) + uplinkedCommand[7] - 0x30;
+  unsigned int month =  ((uplinkedCommand[9]  - 0x30) * 0x10) + uplinkedCommand[10] - 0x30;
+  unsigned int day =    ((uplinkedCommand[12] - 0x30) * 0x10) + uplinkedCommand[13] - 0x30;
+  unsigned int hour =   ((uplinkedCommand[15] - 0x30) * 0x10) + uplinkedCommand[16] - 0x30;
+  unsigned int minute = ((uplinkedCommand[18] - 0x30) * 0x10) + uplinkedCommand[19] - 0x30;
+  unsigned int second = ((uplinkedCommand[21] - 0x30) * 0x10) + uplinkedCommand[22] - 0x30;
 
+  printf("Date set to 20%d/%d/%d %d:%d:%d\n", year, month, day, hour, minute, second);
   updateDS3231Time( hour, minute, second, day, month, year);
-  printf("Date set to 20%x/%x/%x %x:%x:%x\n", year, month, day, hour, minute, second);
 }
 //////// DS3231 SET TIME ////////////////
 
@@ -232,7 +230,7 @@ void sendBMP280Data(){
         //Read pressure and temperature values.
         read_bmp280_values(I2C, 0xF7, &pressure, &temperature, 1000);
 
-        sprintf(downlinkData, "ID22;%d,%d\n", pressure, temperature);
+        sprintf(downlinkData, "ID:22;%d,%d\n", pressure, temperature);
       }
       else
       {
@@ -313,7 +311,6 @@ void main() {
 
   ds3231Available = ds3231_init();
   bmp280Available = bmp280_init();
-  bme280Available = bme280_init(); // no code available yet
   mpu6050Available = mpu6050_init();
   hmc5883Available = hmc5883_init(); // no code available yet
 
@@ -331,7 +328,8 @@ void main() {
     if ( commandLength > 0 ){ 
       printf("Command for shakti: %s\n",uplinkedCommand);
       if ((uplinkedCommand[0] == 'I') && (uplinkedCommand[1] == 'D') && (uplinkedCommand[2] == ':')){
-         shaktiCommand = ((uplinkedCommand[3]  - 0x30) * 10) + uplinkedCommand[4] - 0x30;
+         shaktiCommand = ((uplinkedCommand[3]  - 0x30) * 0x10) + uplinkedCommand[4] - 0x30;
+	 printf("shakti command 0x%x", shaktiCommand);
       }
     }
 
@@ -381,6 +379,10 @@ void main() {
 
       case 0x10:
         sendStatus();
+        break;
+
+      case 0x11:
+        setDS3231Time();
         break;
 
       default:
