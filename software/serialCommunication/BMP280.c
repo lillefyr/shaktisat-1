@@ -43,7 +43,7 @@ int read_bmp280_register(i2c_struct *i2c_instance, unsigned int reg_offset, unsi
   i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_WRITE, 800);
 
 //Writes the pointer to address that needs to be read
-  i2c_write_data(i2c_instance, reg_offset , 1000);
+  i2c_write_data(i2c_instance, reg_offset , 100);
 
 //Stops the I2C transaction to start reading the temperature value.
   i2c_instance->control = I2C_STOP;
@@ -52,12 +52,12 @@ int read_bmp280_register(i2c_struct *i2c_instance, unsigned int reg_offset, unsi
   i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_READ, 800);
 
 /* Make a dummy read as per spec of the I2C controller */
-  ret = i2c_read_data(i2c_instance, &temp, 1000);
+  ret = i2c_read_data(i2c_instance, &temp, 100);
   if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
   i2c_instance->control = I2C_NACK;
 
 //Reads the MSB Byte of temperature [D9 - D1]
-  ret = i2c_read_data(i2c_instance, &read_buf[0], 1000);
+  ret = i2c_read_data(i2c_instance, &read_buf[0], 100);
   if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
 
   i2c_instance->control = I2C_STOP;
@@ -70,13 +70,12 @@ int read_bmp280_values(i2c_struct * i2c_instance, unsigned int reg_offset, unsig
   int i = 0, j = 0,  k = 0, status=0;
   int32_t adc_P, adc_T, var1, var2, var3, var4, t_fine, temp;
   int32_t p;
-  int ret;
 
 //Writes the slave address for write
   i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_WRITE, 800);
 
 //Writes the pointer to address that needs to be read
-  i2c_write_data(i2c_instance, reg_offset , 1000);
+  i2c_write_data(i2c_instance, reg_offset , 100);
 
 //Stops the I2C transaction to start reading the temperature value.
   i2c_instance->control = I2C_STOP;
@@ -85,29 +84,24 @@ int read_bmp280_values(i2c_struct * i2c_instance, unsigned int reg_offset, unsig
   i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_READ, 800);
 
 /* Make a dummy read as per spec of the I2C controller */
-  ret = i2c_read_data(i2c_instance, &temp, 1000);
-  if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
+  i2c_read_data(i2c_instance, &temp, 100);
 
 //Read Pressure
-  ret = i2c_read_data(i2c_instance, &read_buf[0], 1000);
-  if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
-  ret = i2c_read_data(i2c_instance, &read_buf[1], 1000);
-  if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
-  ret = i2c_read_data(i2c_instance, &read_buf[2], 1000);
-  if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
+  i2c_read_data(i2c_instance, &read_buf[0], 100);
+  i2c_read_data(i2c_instance, &read_buf[1], 100);
+  i2c_read_data(i2c_instance, &read_buf[2], 100);
   
 //Read Temperature  
-  ret = i2c_read_data(i2c_instance, &read_buf[3], 1000);
-  if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
-  ret = i2c_read_data(i2c_instance, &read_buf[4], 1000);
-  if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
+  i2c_read_data(i2c_instance, &read_buf[3], 100);
+  i2c_read_data(i2c_instance, &read_buf[4], 100);
   i2c_instance->control = I2C_NACK;
-  ret = i2c_read_data(i2c_instance, &read_buf[5], 1000);
-  if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
+  i2c_read_data(i2c_instance, &read_buf[5], 100);
   
   i2c_instance->control = I2C_STOP;
   adc_P = ((read_buf[0] << 12) | (read_buf[1] << 4) | (read_buf[2] >> 4));
   adc_T = ((read_buf[3] << 12) | (read_buf[4] << 4) | (read_buf[5] >> 4));
+
+  printf("0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", read_buf[0], read_buf[1], read_buf[2], read_buf[3], read_buf[4], read_buf[5]);
 
 // Calculate TEMPERATURE
   var1 = ((((adc_T / 8) - ((int32_t)bmp280_calib_dig_T1 * 2))) * ((int32_t)bmp280_calib_dig_T2)) / 2048;
@@ -115,7 +109,7 @@ int read_bmp280_values(i2c_struct * i2c_instance, unsigned int reg_offset, unsig
     t_fine = var1 + var2;
   temp = (t_fine * 5 + 128) / 256;
   *temperature = temp;
-  printf("\nTemperature Value:%u.%u °C", (temp/100),(temp%100));
+  printf("Temperature Value:%u.%u °C\n", (temp/100),(temp%100));
 
 //Calculate Pressure
   var1 = 0; var2 = 0;
@@ -142,7 +136,7 @@ int read_bmp280_values(i2c_struct * i2c_instance, unsigned int reg_offset, unsig
 
   p = (uint32_t)((int32_t)p + ((var1 + var2 + (int32_t)bmp280_calib_dig_P7) / 16));
   *pressure = p;
-  printf("\nThe Pressure Value:%u.%u Kpa",(p/1000),(p%1000));
+  printf("The Pressure Value:%u.%u Kpa\n",(p/100),(p%1000));
   return 0;
 }
 
@@ -156,7 +150,7 @@ short read_bmp280_values16(i2c_struct * i2c_instance, unsigned int reg_offset, u
   i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_WRITE, 800);
 
 //Writes the pointer to address that needs to be read
-  i2c_write_data(i2c_instance, reg_offset , 1000);
+  i2c_write_data(i2c_instance, reg_offset , 100);
 
 //Stops the I2C transaction to start reading the temperature value.
   i2c_instance->control = I2C_STOP;
@@ -165,13 +159,13 @@ short read_bmp280_values16(i2c_struct * i2c_instance, unsigned int reg_offset, u
   i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_READ, 800);
 
 /* Make a dummy read as per spec of the I2C controller */
-  ret = i2c_read_data(i2c_instance, &temp, 1000);
+  ret = i2c_read_data(i2c_instance, &temp, 100);
   if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
 
-  ret = i2c_read_data(i2c_instance, &read_buf[0], 1000);
+  ret = i2c_read_data(i2c_instance, &read_buf[0], 100);
   if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
   i2c_instance->control = I2C_NACK;
-  ret = i2c_read_data(i2c_instance, &read_buf[1], 1000);
+  ret = i2c_read_data(i2c_instance, &read_buf[1], 100);
   if ( ret != 0 ) { i2c_instance->control = I2C_NACK; return ret; }
   i2c_instance->control = I2C_STOP;
 
@@ -179,11 +173,11 @@ short read_bmp280_values16(i2c_struct * i2c_instance, unsigned int reg_offset, u
 }
 
 int write_bmp280_register(i2c_struct * i2c_instance, unsigned int reg_offset, unsigned char write_value, unsigned long delay) {
-  i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_WRITE, 1000);
+  i2c_send_slave_address(i2c_instance, BMP280_SLAVE_ADDRESS, I2C_WRITE, 100);
 
-  i2c_write_data(i2c_instance, reg_offset , 1000);
+  i2c_write_data(i2c_instance, reg_offset , 100);
 
-  i2c_write_data(i2c_instance, write_value , 1000);
+  i2c_write_data(i2c_instance, write_value , 100);
 
 
 //Stops the I2C transaction to start reading the temperature value.
@@ -200,39 +194,43 @@ int bmp280_init() {
   int ret;
   printf("bmp280_init\n");
 
-  write_bmp280_register(I2C, BMP280_CONFIG_REGISTER, 0xC0, 1000);
+  i2c_init();
 
-  write_bmp280_register(I2C, BMP280_CTRL_MEANS, 0x27, 1000);
+  if(config_i2c(I2C, PRESCALER_COUNT, SCLK_COUNT)) {
+    log_error("Something Wrong In Initialization\n");
+    return -1;
+  }
 
+  write_bmp280_register(I2C, BMP280_CONFIG_REGISTER, 0xC0, 100);
+  write_bmp280_register(I2C, BMP280_CTRL_MEANS, 0x27, 100);
 
-  if(0 == read_bmp280_register(I2C, 0xD0, &tempReadValue, 1000)) {
+  if(0 == read_bmp280_register(I2C, 0xD0, &tempReadValue, 100)) {
     if (0x58 != tempReadValue) {
       printf("BMP280 not detected\n");
+    
+      write_bmp280_register(I2C, BMP280_RESET_REGISTER, 0xB6, 100);
+      read_bmp280_register(I2C, BMP280_RESET_REGISTER, &tempReadValue, 100);
       return -1;
     }
-    else
-    {
-      printf("BMP280 detected\n");
-    }
   }
+  printf("BMP280 found. configure it\n");
     
-  write_bmp280_register(I2C, BMP280_RESET_REGISTER, 0xB6, 1000);
-
-  read_bmp280_register(I2C, BMP280_RESET_REGISTER, &tempReadValue, 1000);
+  if ( write_bmp280_register(I2C, BMP280_RESET_REGISTER, 0xB6, 100) != 0) { return; }
+  if ( read_bmp280_register(I2C, BMP280_RESET_REGISTER, &tempReadValue, 100) != 0) { return; }
   
-  bmp280_calib_dig_T1 = read_bmp280_values16(I2C, BMP280_REG_DIG_T1, 1000);
-  bmp280_calib_dig_T2 = read_bmp280_values16(I2C, BMP280_REG_DIG_T2, 1000);
-  bmp280_calib_dig_T3 = read_bmp280_values16(I2C, BMP280_REG_DIG_T3, 1000);
+  bmp280_calib_dig_T1 = read_bmp280_values16(I2C, BMP280_REG_DIG_T1, 100);
+  bmp280_calib_dig_T2 = read_bmp280_values16(I2C, BMP280_REG_DIG_T2, 100);
+  bmp280_calib_dig_T3 = read_bmp280_values16(I2C, BMP280_REG_DIG_T3, 100);
 
-  bmp280_calib_dig_P1 = read_bmp280_values16(I2C, BMP280_REG_DIG_P1, 1000);
-  bmp280_calib_dig_P2 = read_bmp280_values16(I2C, BMP280_REG_DIG_P2, 1000);
-  bmp280_calib_dig_P3 = read_bmp280_values16(I2C, BMP280_REG_DIG_P3, 1000);
-  bmp280_calib_dig_P4 = read_bmp280_values16(I2C, BMP280_REG_DIG_P4, 1000);
-  bmp280_calib_dig_P5 = read_bmp280_values16(I2C, BMP280_REG_DIG_P5, 1000);
-  bmp280_calib_dig_P6 = read_bmp280_values16(I2C, BMP280_REG_DIG_P6, 1000);
-  bmp280_calib_dig_P7 = read_bmp280_values16(I2C, BMP280_REG_DIG_P7, 1000);
-  bmp280_calib_dig_P8 = read_bmp280_values16(I2C, BMP280_REG_DIG_P8, 1000);
-  bmp280_calib_dig_P9 = read_bmp280_values16(I2C, BMP280_REG_DIG_P9, 1000);
+  bmp280_calib_dig_P1 = read_bmp280_values16(I2C, BMP280_REG_DIG_P1, 100);
+  bmp280_calib_dig_P2 = read_bmp280_values16(I2C, BMP280_REG_DIG_P2, 100);
+  bmp280_calib_dig_P3 = read_bmp280_values16(I2C, BMP280_REG_DIG_P3, 100);
+  bmp280_calib_dig_P4 = read_bmp280_values16(I2C, BMP280_REG_DIG_P4, 100);
+  bmp280_calib_dig_P5 = read_bmp280_values16(I2C, BMP280_REG_DIG_P5, 100);
+  bmp280_calib_dig_P6 = read_bmp280_values16(I2C, BMP280_REG_DIG_P6, 100);
+  bmp280_calib_dig_P7 = read_bmp280_values16(I2C, BMP280_REG_DIG_P7, 100);
+  bmp280_calib_dig_P8 = read_bmp280_values16(I2C, BMP280_REG_DIG_P8, 100);
+  bmp280_calib_dig_P9 = read_bmp280_values16(I2C, BMP280_REG_DIG_P9, 100);
   printf("BMP280 initialized\n");
   return 0;
 }

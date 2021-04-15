@@ -66,8 +66,7 @@ int ds3231_init(){
 
   i2c_init();
 
-  if(config_i2c(I2C, PRESCALER_COUNT, SCLK_COUNT))
-  {
+  if(config_i2c(I2C, PRESCALER_COUNT, SCLK_COUNT)) {
     log_error("\tSomething Wrong In Initialization\n");
     return -1;
   }

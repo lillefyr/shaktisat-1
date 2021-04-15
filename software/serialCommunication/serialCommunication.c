@@ -11,6 +11,7 @@
 #include "MPU6050.h"
 #include "HMC5883.h"
 #include "BMP280.h"
+#include "BMP280_softI2C.h"
 #include "DS3231.h"
 
 #define OK 0
@@ -29,6 +30,7 @@ uint64_t oldTimerValue;
 
 int8_t ds3231Available = -1;
 int8_t bmp280Available = -1;
+int8_t bmp280softI2CAvailable = -1;
 int8_t hmc5883Available = -1;
 int8_t mpu6050Available = -1;
 
@@ -47,7 +49,7 @@ int16_t GyroX;
 int16_t GyroY;
 int16_t GyroZ;
 
-int8_t shaktiCommand = -1;
+uint8_t shaktiCommand = 255;
 
 int16_t msgcnt = 0;
 
@@ -59,6 +61,9 @@ int write_to_uart(char *data) {
     write_uart_character(HC12_UART, *data);
     data++;
   }
+  write_uart_character(HC12_UART, '<');
+  write_uart_character(HC12_UART, '/');
+  write_uart_character(HC12_UART, '>');
   write_uart_character(HC12_UART, '\n');
 }
 
@@ -191,8 +196,9 @@ void sendDS3231Time(){
     ds3231Available = ds3231_init();
   }
   if ( readDS3231(&read_buf) < 0 ) {
-    sprintf(downlinkData, "ID:30;ds3231 error\n");
-    ds3231Available = -1;
+    sprintf(downlinkData, "ID:30;DS3231 error\n");
+    write_to_uart(downlinkData);  // downlink onboard date and time
+    ds3231Available = ds3231_init();
     return;
   } // bad data, skip
 
@@ -207,6 +213,7 @@ void sendDS3231Time(){
   || (read_buf[1] == 0xFF) 
   || (read_buf[0] == 0xFF)){
     // bad data, dont send
+    sprintf(downlinkData, "ID:30;DS3231 error\n");
     return;
   }
 
@@ -219,7 +226,7 @@ void sendBMP280Data(){
   printf("read pressure and temp\n");
   if (bmp280Available == 1 ) {
     // try to initialize again
-    bmp280Available = bmp280_init();
+      bmp280Available = bmp280_init();
   }
 
   for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
@@ -254,6 +261,49 @@ void sendBMP280Data(){
   write_to_uart(downlinkData);
 }
 //////// BMP280 /////////////////////////
+//
+//////// BMP280_softI2C /////////////////////////
+void sendBMP280_softI2C_Data(){
+  int i;
+  bmp280Available = 1;
+  printf("bmp280_softI2C  read pressure and temp\n");
+  if (bmp280Available == 1 ) {
+	  return;
+    // try to initialize again
+    bmp280softI2CAvailable = bmp280_softI2C_init();
+  }
+
+  for (i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+  if ( bmp280softI2CAvailable == 0 ) {
+    write_bmp280_softI2C_register(BMP280_CTRL_MEANS, BMP280_NORMAL_MODE, 1000);     // Set it to NORMAL MODE
+
+    tempReadValue = 0x09; // zero is true
+    i = 0;
+    while ((tempReadValue & 0x09) && (i<32000)) {
+      read_bmp280_softI2C_register(BMP280_STATUS_REGISTER, &tempReadValue, 1000);
+      i++;
+    }
+    if ( i >= 32000 ) {
+      //Display the error
+      sprintf(downlinkData, "ID:30;bmp280_softI2C not ready\n");
+      bmp280softI2CAvailable = 1; // try to reconnect again
+    }
+    else
+    {
+      //Read pressure and temperature values.
+      read_bmp280_softI2C_values(0xF7, &pressure, &temperature, 1000);
+    }
+  }
+  else
+  {
+    //Display the error
+    sprintf(downlinkData, "ID:30;bmp280_softI2C not available\n");
+    bmp280softI2CAvailable = 1; // try to reconnect again
+  }
+  write_to_uart(downlinkData);
+}
+//////// BMP280_softI2C /////////////////////////
+ 
  
 //////// MPU6050 /////////////////////////
 void sendMPU6050Data(){
@@ -283,7 +333,9 @@ void sendMPU6050Data(){
 }
 //////// MPU6050 /////////////////////////
 
-void main() {
+uint8_t cnt1 = 0;
+
+int runInit(){
   *pinmux_config_reg = 0x0055;
 
   set_baud_rate(HC12_UART, 9600);
@@ -291,18 +343,18 @@ void main() {
 
   delay_loop(1000, 1000);
 
-  sprintf(downlinkData, "ID:30;ShaktiSat1 online\n");
-  write_to_uart(downlinkData);
-  delay_loop(1000, 1000);
-
   // I2C init for all devices (except soft I2C)
-  printf("i2c init: SCL is %x and expected %x, SDA is %x and expected %x\n", I2C_SCL, GPIO5, I2C_SDA, GPIO6);
-  printf("change in bsp/include/gpio_i2c.h\n");
+  //printf("i2c init: SCL is %x and expected %x, SDA is %x and expected %x\n", I2C_SCL, GPIO5, I2C_SDA, GPIO6);
+  //printf("change in bsp/include/gpio_i2c.h\n");
   i2c_init();
 
   //Initialises I2C Controller
   if(config_i2c(I2C, PRESCALER_COUNT,SCLK_COUNT)) {
-    printf("Error in I2c initialization, stopping\n");
+    if ( cnt1 == 0 ){
+      sprintf(downlinkData, "ID:30;Error in I2c initialization\n");
+      write_to_uart(downlinkData);
+    }
+    cnt1++;
     return -1;
   }
   printf("I2C Intilized\n");
@@ -311,8 +363,30 @@ void main() {
 
   ds3231Available = ds3231_init();
   bmp280Available = bmp280_init();
+  bmp280softI2CAvailable = bmp280_softI2C_init();
   mpu6050Available = mpu6050_init();
   hmc5883Available = hmc5883_init(); // no code available yet
+
+  return 0;
+}
+
+/////// MAIN ////////////////////////////
+void main() {
+
+  printf("ShaktiSat1 SerialCommunication\n");
+  printf("\n");
+  sprintf(downlinkData, "ID:30;ShaktiSat1 starting\n");
+  write_to_uart(downlinkData);
+  delay_loop(1000, 1000);
+
+  int rc = 1;
+  while (rc != 0) {
+    rc = runInit();
+  }
+
+  sprintf(downlinkData, "ID:30;ShaktiSat1 online\n");
+  write_to_uart(downlinkData);
+  delay_loop(1000, 1000);
 
   while (1)
   {
@@ -324,12 +398,12 @@ void main() {
     commandLength = read_from_uart(HC12_UART, uplinkedCommand);
 
     // \n found, end of command
-    shaktiCommand = -1;
+    shaktiCommand = 255;
     if ( commandLength > 0 ){ 
       printf("Command for shakti: %s\n",uplinkedCommand);
       if ((uplinkedCommand[0] == 'I') && (uplinkedCommand[1] == 'D') && (uplinkedCommand[2] == ':')){
          shaktiCommand = ((uplinkedCommand[3]  - 0x30) * 0x10) + uplinkedCommand[4] - 0x30;
-	 printf("shakti command 0x%x", shaktiCommand);
+	 printf("shakti command 0x%x\n", shaktiCommand);
       }
     }
 
@@ -339,10 +413,9 @@ void main() {
     }
 
     // get data for downlink
-    // This is approx 40 seconds
+    // This is approx 10 seconds
     timerValue = get_timer_value()/200000000;
-
-    if (( shaktiCommand == -1 ) && (oldTimerValue != timerValue)) {
+    if (( shaktiCommand == 255 ) && (oldTimerValue != timerValue)) {
       shaktiCommand = 1;
       oldTimerValue = timerValue;
       printf("timervalue=%d\n", timerValue);
@@ -384,6 +457,22 @@ void main() {
       case 0x11:
         setDS3231Time();
         break;
+
+      case 0x12:
+        sendBMP280_softI2C_Data();
+        break;
+
+      case 0x99:
+        sprintf(downlinkData, "ID:30;ShaktiSat1 restarting\n");
+        write_to_uart(downlinkData);
+        rc = runInit();
+	if ( rc != 0 ) {
+          sprintf(downlinkData, "ID:30;Init failed. rc = %d\n", rc);
+	} else {
+          sprintf(downlinkData, "ID:30;ShaktiSat1 restartet\n");
+	}
+        write_to_uart(downlinkData);
+	break;
 
       default:
         break;

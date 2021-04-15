@@ -28,9 +28,13 @@ int i=0;
  
 void mpu6050_measuring_value(char *readbuf) {
   // read accelerometer data
+  printf("I2cSendSlaveAddress\n");
   I2cSendSlaveAddress(MPU6050_SLAVE_ADDRESS, I2C_WRITE, 100);//selecting slave to be read
+  printf("I2cWriteData\n");
   I2cWriteData(MPU_6050_OUTPUT_BEGIN, 100);//selecting register to be read
+  printf("I2cSendSlaveAddress\n");
   I2cSendSlaveAddress(MPU6050_SLAVE_ADDRESS, I2C_READ, 100);
+  printf("I2c_shakti_read_bytes\n");
   I2c_shakti_readbytes(readbuf,14,1, 100);//to read the output values
 
 /*
