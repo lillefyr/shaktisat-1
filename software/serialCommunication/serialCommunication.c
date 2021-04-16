@@ -26,7 +26,7 @@ char downlinkData[200];
 int  cnt=0;
 int  commandLength;
 uint64_t timerValue;
-uint64_t oldTimerValue;
+uint64_t oldTimerValue = 99999;
 
 int8_t ds3231Available = -1;
 int8_t bmp280Available = -1;
@@ -50,6 +50,7 @@ int16_t GyroY;
 int16_t GyroZ;
 
 uint8_t shaktiCommand = 255;
+uint8_t nextShaktiCommand = 0;
 
 int16_t msgcnt = 0;
 
@@ -388,6 +389,8 @@ void main() {
   write_to_uart(downlinkData);
   delay_loop(1000, 1000);
 
+  nextShaktiCommand = 0;
+
   while (1)
   {
     // read command from GS ( in 16 byte pieces )
@@ -398,7 +401,6 @@ void main() {
     commandLength = read_from_uart(HC12_UART, uplinkedCommand);
 
     // \n found, end of command
-    shaktiCommand = 255;
     if ( commandLength > 0 ){ 
       printf("Command for shakti: %s\n",uplinkedCommand);
       if ((uplinkedCommand[0] == 'I') && (uplinkedCommand[1] == 'D') && (uplinkedCommand[2] == ':')){
@@ -415,43 +417,51 @@ void main() {
     // get data for downlink
     // This is approx 10 seconds
     timerValue = get_timer_value()/200000000;
-    if (( shaktiCommand == 255 ) && (oldTimerValue != timerValue)) {
-      shaktiCommand = 1;
+    if (oldTimerValue != timerValue) {
+      shaktiCommand = nextShaktiCommand;
       oldTimerValue = timerValue;
-      printf("timervalue=%d\n", timerValue);
+      printf("timervalue=%d shaktiCommand=%d %d\n", timerValue, nextShaktiCommand, shaktiCommand);
     }
 
     switch ( shaktiCommand ){
       case 0x00:
         sendPONG();
+        nextShaktiCommand++;
         break;
 
       case 0x01:
         sendDS3231Time();
+        nextShaktiCommand++;
         break;
 
       case 0x02:
         sendBMP280Data();
+        nextShaktiCommand++;
         break;
 
       case 0x03:
         sendMPU6050Data();
+        nextShaktiCommand++;
         break;
 
       case 0x04:
         sendHMC5883Data();
+        nextShaktiCommand++;
         break;
 
       case 0x05:
         sendBoardTemperature();
+        nextShaktiCommand = 9;
         break;
 
       case 0x09:
         sendGPSData();
+        nextShaktiCommand = 0x10;
         break;
 
       case 0x10:
         sendStatus();
+        nextShaktiCommand = 0;
         break;
 
       case 0x11:
@@ -482,5 +492,6 @@ void main() {
 //    sprintf(downlinkData, "ID:30;Shaktisat %d\n", msgcnt);
 //    write_to_uart(downlinkData);
     msgcnt++;
+    shaktiCommand = 255;
   }
 }
