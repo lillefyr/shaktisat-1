@@ -49,8 +49,8 @@ int16_t GyroX;
 int16_t GyroY;
 int16_t GyroZ;
 
-uint8_t shaktiCommand = 255;
-uint8_t nextShaktiCommand = 0;
+int shaktiCommand = -1;
+int nextShaktiCommand = 0;
 
 int16_t msgcnt = 0;
 
@@ -418,35 +418,38 @@ void main() {
     // This is approx 10 seconds
     timerValue = get_timer_value()/200000000;
     if (oldTimerValue != timerValue) {
+      printf("timervalue=%d ", timerValue);
+      printf("oldTimerValue=%d ", oldTimerValue);
+      printf("nextShaktiCommand=%d ", nextShaktiCommand);
+      printf("shaktiCommand=%d \n", shaktiCommand);
       shaktiCommand = nextShaktiCommand;
       oldTimerValue = timerValue;
-      printf("timervalue=%d shaktiCommand=%d %d\n", timerValue, nextShaktiCommand, shaktiCommand);
     }
 
     switch ( shaktiCommand ){
       case 0x00:
         sendPONG();
-        nextShaktiCommand++;
+        nextShaktiCommand=1;
         break;
 
       case 0x01:
         sendDS3231Time();
-        nextShaktiCommand++;
+        nextShaktiCommand=2;
         break;
 
       case 0x02:
         sendBMP280Data();
-        nextShaktiCommand++;
+        nextShaktiCommand=3;
         break;
 
       case 0x03:
         sendMPU6050Data();
-        nextShaktiCommand++;
+        nextShaktiCommand=4;
         break;
 
       case 0x04:
         sendHMC5883Data();
-        nextShaktiCommand++;
+        nextShaktiCommand=5;
         break;
 
       case 0x05:
@@ -492,6 +495,6 @@ void main() {
 //    sprintf(downlinkData, "ID:30;Shaktisat %d\n", msgcnt);
 //    write_to_uart(downlinkData);
     msgcnt++;
-    shaktiCommand = 255;
+    shaktiCommand = -nextShaktiCommand;
   }
 }
