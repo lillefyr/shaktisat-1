@@ -93,19 +93,57 @@ int read_from_uart(uart_struct *UART, char *data) {
 
 
 //////// GPS ////////////////////////
-int sendGPSData() {
-  char GPSdata[100];
-  for (uint8_t i=0; i< 100; i++) { GPSdata[i] = 0x00; }
-  printf("read from GPS UART\n");
-  commandLength = read_from_uart(GPS_UART, &GPSdata);
+char GPGGA[127] = {0}; // $GPGGA,161229.487,3723.2475,N,12158.3416,W,1,07,1.0,9.0,M,,,,0000*18
+char GLGSV[127] = {0}; // $GLGSV,1,1,00*65
+char GNGLL[127] = {0}; // $GNGLL,,,,,,V,N*i
+char GNRMC[127] = {0}; // $GNRMC,,V,,,,,,,,,,N*4D
+char GNVTG[127] = {0}; // $GNVTG,,,,,,,,,N,,,09,07,,,12*71
 
-  // \n found, end of command
-  if ( commandLength > 0 ){
-    sprintf(downlinkData, "ID:30;%s\n",GPSdata);
+int sendGPSData() {
+  uint8_t i;
+  char GPSdata[127];
+  for (uint8_t i=0; i< 127; i++) { GPSdata[i] = 0x00; }
+  printf("read from GPS UART\n");
+  int commandLength = read_from_uart(GPS_UART, &GPSdata);
+
+  if (( GPSdata[0] == '$' ) && ( GPSdata[1] == 'G' )) {
+    if (( GPSdata[2] == 'P' ) && ( GPSdata[3] == 'G' ) && ( GPSdata[4] == 'G' ) && ( GPSdata[5] == 'A' )){
+      for (i=0; ((i < commandLength) && (i < 100)); i++)   { GPGGA[i] = GPSdata[i]; }
+    }else{
+      if (( GPSdata[2] == 'L' ) && ( GPSdata[3] == 'G' ) && ( GPSdata[4] == 'S' ) && ( GPSdata[5] == 'V' )){
+        for (i=0; ((i < commandLength) && (i < 100)); i++)   { GLGSV[i] = GPSdata[i]; }
+      }else{
+        if ( GPSdata[2] == 'N' ) {
+          if (( GPSdata[3] == 'G' ) && ( GPSdata[4] == 'G' ) && ( GPSdata[5] == 'L' )){
+            for (i=0; ((i < commandLength) && (i < 100)); i++) { GNGLL[i] = GPSdata[i]; }
+          }
+          if (( GPSdata[3] == 'R' ) && ( GPSdata[4] == 'M' ) && ( GPSdata[5] == 'C' )){
+            for (i=0; ((i < commandLength) && (i < 100)); i++) { GNRMC[i] = GPSdata[i]; }
+          }
+          if (( GPSdata[3] == 'V' ) && ( GPSdata[4] == 'T' ) && ( GPSdata[5] == 'G' )){
+            for (i=0; ((i < commandLength) && (i < 100)); i++) { GNVTG[i] = GPSdata[i]; }
+          }
+        }else{
+          // \n found, end of command
+          if ( commandLength > 0 ){
+            //downlink "unhandled command"
+            sprintf(downlinkData, "ID:30;%s\n",GPSdata);
+          }else{
+            sprintf(downlinkData, "ID:30;NO GPS data received\n");
+          }
+          write_to_uart(downlinkData);
+	}
+      }
+    }  
+    // At this point we can downlink the data we have
+    if ( GPGGA[0] != 0x0 ) { write_to_uart(GPGGA); }
+    if ( GLGSV[0] != 0x0 ) { write_to_uart(GLGSV); }
+    if ( GNGLL[0] != 0x0 ) { write_to_uart(GNGLL); }
+    if ( GNRMC[0] != 0x0 ) { write_to_uart(GNRMC); }
+    if ( GNVTG[0] != 0x0 ) { write_to_uart(GNVTG); }
   }else{
-    sprintf(downlinkData, "ID:30;NO GPS data received\n");
+    sprintf(downlinkData, "ID:30;Invalid GPS data received (ignore)\n");
   }
-  write_to_uart(downlinkData); 
 }
 //////// GPS ////////////////////////
 
@@ -134,9 +172,25 @@ void setDS3231Time(){
 
 //////// QMC5833 / HMC5833 //////////////
 void sendHMC5883Data(){
-  getDataFromHMC5883();
-  for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
-  sprintf(downlinkData, "ID:30;HMC5883 not implemented\n");
+  float heading;
+  if ( getDataFromHMC5883(I2C, &heading, 1000) != 0) {
+     sprintf(downlinkData, "ID:30;HMC5883 error in heading\n");
+  }
+  else
+  {
+    char *headingSign = (heading < 0) ? "-" : "";
+    float headingVal = (heading < 0) ? -heading : heading;
+    int headingInt1 = headingVal;                  // Get the integer part
+    float headingFrac = headingVal - headingInt1;  // Get fraction part
+    int headingInt2 = trunc(headingFrac * 10000);  // Turn into integer
+    // Print as parts, note that you need 0-padding for fractional bit.
+
+    // When arrives downlink will be converted back to float
+    for (int i=0; i < 32; i++) { downlinkData[i] = 0x00; }
+    sprintf (downlinkData, "ID:24;%s%d.%04d\n", headingSign, headingInt1, headingInt2);
+    printf(downlinkData);
+  }
+
   write_to_uart(downlinkData); 
 }
 //////// QMC5833 / HMC5833 //////////////
@@ -162,12 +216,9 @@ void sendBoardTemperature(){
   int voltInt2 = trunc(voltFrac * 10000);  // Turn into integer
   // Print as parts, note that you need 0-padding for fractional bit.
 
-  sprintf (downlinkData, "ID:05;%s%d.%04d,%s%d.%04d\n", tempSign, tempInt1, tempInt2, voltSign, voltInt1, voltInt2);
+  // When arrives downlink will be converted back to float
+  sprintf (downlinkData, "ID:25;%s%d.%04d,%s%d.%04d\n", tempSign, tempInt1, tempInt2, voltSign, voltInt1, voltInt2);
 
-  //sprintf(downlinkData, "ID:30;status not implemented\n");
-  //sprintf(downlinkData, "ID:05;%f,%f\n", temp, voltage);
-  //ID:05;38.913574,0.950683
-  //0123456789012345678901234
   write_to_uart(downlinkData);
 }
 //////// BoardTemperature //////////////
@@ -238,25 +289,26 @@ void sendBMP280Data(){
         //Read pressure and temperature values.
         read_bmp280_values(I2C, 0xF7, &pressure, &temperature, 1000);
 
-        sprintf(downlinkData, "ID:22;%d,%d\n", pressure, temperature);
+        // set decimal point  hectoPascal and 2 decimals on temp
+        sprintf(downlinkData, "ID:22;%d.%d,%d.%d\n", pressure/100, pressure%100, temperature/100, temperature%100);
       }
       else
       {
-        sprintf(downlinkData, "ID:30;BMP280 read failed (1)\n");
+        sprintf(downlinkData, "ID:30;BMP280 Temperature invalid\n");
         bmp280Available = 1; // try to reconnect again
       }
     }
     else
     {
       //Display the error
-      sprintf(downlinkData, "ID:30;BMP280 read failed (2)\n");
+      sprintf(downlinkData, "ID:30;BMP280 I2C bus nack\n");
       bmp280Available = 1; // try to reconnect again
     }
   }
   else
   {
     //Display the error
-    sprintf(downlinkData, "ID:30;BMP280 read failed (3)\n");
+    sprintf(downlinkData, "ID:30;BMP280 not available\n");
     bmp280Available = 1; // try to reconnect again
   }
   write_to_uart(downlinkData);
@@ -269,7 +321,6 @@ void sendBMP280_softI2C_Data(){
   bmp280Available = 1;
   printf("bmp280_softI2C  read pressure and temp\n");
   if (bmp280Available == 1 ) {
-	  return;
     // try to initialize again
     bmp280softI2CAvailable = bmp280_softI2C_init();
   }
@@ -366,7 +417,7 @@ int runInit(){
   bmp280Available = bmp280_init();
   bmp280softI2CAvailable = bmp280_softI2C_init();
   mpu6050Available = mpu6050_init();
-  hmc5883Available = hmc5883_init(); // no code available yet
+  hmc5883Available = hmc5883_init(); 
 
   return 0;
 }
@@ -439,6 +490,10 @@ void main() {
 
       case 0x02:
         sendBMP280Data();
+	// In case of error, retry once
+        if (bmp280Available == 1 ){
+           sendBMP280Data();
+        }
         nextShaktiCommand=3;
         break;
 
@@ -494,7 +549,7 @@ void main() {
 //    delay_loop(3000, 3000);
 //    sprintf(downlinkData, "ID:30;Shaktisat %d\n", msgcnt);
 //    write_to_uart(downlinkData);
-    msgcnt++;
+//    msgcnt++;
     shaktiCommand = -nextShaktiCommand;
   }
 }
